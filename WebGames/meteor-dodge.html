@@ -51,6 +51,7 @@
   let extraLifeMsg, nextLifeScore;
   let waveCharge, waveActive, waveRing;
   let shakeT, shakeP;
+  let boss, bossNextScore, bossWaveMsg;
 
   const player = { x: W/2, y: H-52, speed: 420, tilt:0, tiltTarget:0 };
 
@@ -88,6 +89,10 @@
     shakeT = 0;
     shakeP = 0;
 
+    boss = null;
+    bossNextScore = 1200;
+    bossWaveMsg = 0;
+
     player.x = W/2;
     player.tilt = 0;
     player.tiltTarget = 0;
@@ -116,8 +121,24 @@
       rot: rand(0, Math.PI*2),
       spin: rand(-1.4,1.4),
       hue: rand(12, 36),
-      points
+      points,
+      trail: []
     });
+  }
+
+  function spawnBoss() {
+    boss = {
+      x: W / 2,
+      y: -110,
+      r: 82,
+      hp: 100,
+      enterV: 68,
+      dir: Math.random() > 0.5 ? 1 : -1,
+      speed: 85,
+      dropTimer: 0,
+      hitFlash: 0
+    };
+    bossWaveMsg = 3.2;
   }
 
   function hitRectCircle(rx, ry, rw, rh, cx, cy, cr) {
@@ -154,6 +175,15 @@
     waveCharge = 0;
     waveActive = 3.4;
     waveRing = 0.8;
+
+    if (boss) {
+      const d = Math.hypot(player.x - boss.x, player.y - boss.y);
+      if (d <= boss.r + 220) {
+        boss.hp = Math.max(0, boss.hp - 34);
+        boss.hitFlash = 0.22;
+        for (let i=0;i<18;i++) particles.push({x:boss.x,y:boss.y,vx:rand(-160,160),vy:rand(-160,160),a:0,l:rand(.2,.5),s:rand(2,5),c:'rgba(255,198,110,1)'});
+      }
+    }
   }
 
   function update(dt) {
@@ -165,6 +195,7 @@
     if (extraLifeMsg > 0) extraLifeMsg -= dt;
     if (waveActive > 0) waveActive -= dt;
     if (waveRing > 0) waveRing -= dt;
+    if (bossWaveMsg > 0) bossWaveMsg -= dt;
     if (shakeT > 0) {
       shakeT -= dt;
       const tNorm = Math.max(0, shakeT / 2.0);
@@ -187,9 +218,16 @@
 
     const slow = waveActive > 0 ? 0.58 : 1;
     const spawnMul = waveActive > 0 ? 0.72 : 1;
+    const scoreInt = Math.floor(score);
+
+    if (!boss && scoreInt >= bossNextScore) {
+      spawnBoss();
+      bossNextScore += 1600;
+    }
 
     spawnTimer += dt;
-    const gap = Math.max(0.16, (0.92 - t*0.015) / spawnMul);
+    const bossSpawnNerf = boss ? 1.45 : 1;
+    const gap = Math.max(0.16, ((0.92 - t*0.015) / spawnMul) * bossSpawnNerf);
     while (spawnTimer >= gap) {
       spawnTimer -= gap;
       spawnMeteor();
@@ -200,6 +238,8 @@
       m.y += m.vy * dt * slow;
       m.x += m.vx * dt * slow;
       m.rot += m.spin * dt * slow;
+      m.trail.push({ x: m.x, y: m.y, r: m.r * 0.72 });
+      if (m.trail.length > 7) m.trail.shift();
       if (m.x < -m.r) m.x = W + m.r;
       if (m.x > W + m.r) m.x = -m.r;
       if (hitRectCircle(player.x-18, player.y-20, 36, 40, m.x, m.y, m.r*0.9)) {
@@ -209,7 +249,44 @@
     }
     meteors = meteors.filter(m => m.y < H + 60);
 
-    const scoreInt = Math.floor(score);
+    if (boss) {
+      if (boss.hitFlash > 0) boss.hitFlash -= dt;
+      if (boss.y < 102) boss.y += boss.enterV * dt;
+      else {
+        boss.x += boss.dir * boss.speed * dt;
+        if (boss.x < boss.r + 20 || boss.x > W - boss.r - 20) boss.dir *= -1;
+      }
+
+      boss.dropTimer += dt;
+      if (boss.dropTimer >= 0.72) {
+        boss.dropTimer = 0;
+        const mr = rand(11, 20);
+        meteors.push({
+          x: boss.x + rand(-boss.r * 0.5, boss.r * 0.5),
+          y: boss.y + boss.r * 0.75,
+          r: mr,
+          vx: rand(-60, 60),
+          vy: rand(170, 285),
+          rot: rand(0, Math.PI * 2),
+          spin: rand(-2.2, 2.2),
+          hue: rand(10, 30),
+          points: Array.from({ length: 10 }, (_, i) => {
+            const a = (i / 10) * Math.PI * 2;
+            return { a, rr: mr * rand(0.84, 1.08) };
+          }),
+          trail: []
+        });
+      }
+
+      if (hitRectCircle(player.x-18, player.y-20, 36, 40, boss.x, boss.y, boss.r*0.82)) hitPlayer();
+      if (boss.hp <= 0) {
+        for (let i=0;i<44;i++) particles.push({x:boss.x,y:boss.y,vx:rand(-230,230),vy:rand(-230,230),a:0,l:rand(.25,.8),s:rand(2,7),c:'rgba(255,180,90,1)'});
+        score += 220;
+        boss = null;
+        bossWaveMsg = 1.2;
+      }
+    }
+
     if (scoreInt >= 1000) {
       laserTimer += dt;
       while (laserTimer >= 3) {
@@ -332,6 +409,17 @@
     if (invincible <= 0 || Math.floor(invincible*12)%2===0) drawRocket();
 
     for (const m of meteors) {
+      for (let i = 0; i < m.trail.length; i++) {
+        const tp = m.trail[i];
+        const a = (i + 1) / m.trail.length;
+        ctx.fillStyle = `rgba(255,160,90,${a * 0.11})`;
+        ctx.beginPath();
+        ctx.arc(tp.x, tp.y, tp.r * a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    for (const m of meteors) {
       ctx.save(); ctx.translate(m.x,m.y); ctx.rotate(m.rot);
       const g = ctx.createRadialGradient(-m.r*0.3,-m.r*0.35,1,0,0,m.r*1.25);
       g.addColorStop(0,`hsla(${m.hue},95%,73%,0.95)`); g.addColorStop(0.35,`hsla(${m.hue+10},92%,58%,0.9)`); g.addColorStop(1,`hsla(${m.hue+20},88%,36%,0.95)`);
@@ -349,6 +437,34 @@
       ctx.fill();
 
       ctx.restore();
+    }
+
+    if (boss) {
+      ctx.save();
+      ctx.translate(boss.x, boss.y);
+      const bg = ctx.createRadialGradient(-boss.r*0.28,-boss.r*0.3,1,0,0,boss.r*1.2);
+      bg.addColorStop(0, boss.hitFlash > 0 ? 'rgba(255,250,220,0.98)' : 'rgba(255,204,130,0.96)');
+      bg.addColorStop(0.42, 'rgba(230,122,66,0.96)');
+      bg.addColorStop(1, 'rgba(110,48,28,0.98)');
+      ctx.fillStyle = bg;
+      ctx.beginPath(); ctx.arc(0,0,boss.r,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,235,205,0.3)';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(-10,-12,boss.r*0.68,0.2,2.7); ctx.stroke();
+      ctx.restore();
+
+      const barW = 260;
+      const barX = W/2 - barW/2;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(barX, 14, barW, 14);
+      ctx.fillStyle = 'rgba(255,112,88,0.95)';
+      ctx.fillRect(barX, 14, barW * (boss.hp / 100), 14);
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      ctx.strokeRect(barX, 14, barW, 14);
+      ctx.fillStyle = 'rgba(255,230,215,0.95)';
+      ctx.font = 'bold 12px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('BOSS CORE', W/2, 26);
     }
 
     for (const p of particles) {
@@ -370,6 +486,17 @@
     ctx.fillText(`Difficulty Lv.${level}`,12,22);
 
     if (waveActive > 0) { ctx.fillStyle='rgba(160,220,255,0.95)'; ctx.font='bold 20px system-ui'; ctx.textAlign='center'; ctx.fillText('🌊 Slow Wave Activated!', W/2, 80); }
+    if (bossWaveMsg > 0) {
+      const p = Math.min(1, bossWaveMsg / 0.45);
+      ctx.fillStyle = `rgba(255,130,105,${0.22 + p*0.3})`;
+      ctx.fillRect(W/2-180, 58, 360, 38);
+      ctx.strokeStyle = `rgba(255,170,145,${0.5 + p*0.35})`;
+      ctx.strokeRect(W/2-180, 58, 360, 38);
+      ctx.fillStyle = `rgba(255,232,220,${0.82 + p*0.18})`;
+      ctx.font = 'bold 22px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(boss ? '🔥 Boss Wave Incoming!' : '💥 Boss Destroyed!', W/2, 84);
+    }
     if (extraLifeMsg > 0) {
       const a = Math.min(1, extraLifeMsg/0.25);
       ctx.fillStyle=`rgba(157,255,190,${0.2 + a*0.35})`; ctx.fillRect(W/2-170,16,340,42);
