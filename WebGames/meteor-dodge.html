@@ -6,24 +6,41 @@
   <title>Meteor Dodge</title>
   <style>
     :root { color-scheme: dark; }
-    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:#070b18; color:#fff; display:grid; place-items:center; min-height:100vh; }
-    .wrap { width:min(900px,95vw); }
-    h1 { margin:.2rem 0; }
-    p { opacity:.85; margin:.2rem 0 .8rem; }
-    canvas { width:100%; max-width:900px; height:auto; border:1px solid #2b335c; border-radius:12px; background:linear-gradient(#0b1130,#090d1f); display:block; }
-    .row { display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:10px; flex-wrap:wrap; }
-    .pill { padding:6px 10px; border:1px solid #2b335c; border-radius:999px; background:#111735; }
-    button { background:#4f7cff; color:#fff; border:0; border-radius:10px; padding:8px 12px; cursor:pointer; font-weight:700; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #070b18;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+    }
+    .wrap { width: min(900px, 95vw); }
+    h1 { margin: .2rem 0; }
+    p { opacity: .85; margin: .2rem 0 .8rem; }
+    canvas {
+      width: 100%;
+      max-width: 900px;
+      height: auto;
+      border: 1px solid #2b335c;
+      border-radius: 12px;
+      background: linear-gradient(#0b1130, #090d1f);
+      display: block;
+    }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 10px; flex-wrap: wrap; }
+    .pill { padding: 6px 10px; border: 1px solid #2b335c; border-radius: 999px; background: #111735; }
+    button { background: #4f7cff; color: #fff; border: 0; border-radius: 10px; padding: 8px 12px; cursor: pointer; font-weight: 700; }
   </style>
 </head>
 <body>
   <main class="wrap">
     <h1>☄️ Meteor Dodge</h1>
-    <p>Move with ← → (or A / D). Survive as long as you can.</p>
+    <p>Move with ← → (or A / D). You have <strong>2 lives</strong>. Survive as long as you can.</p>
     <canvas id="game" width="900" height="520"></canvas>
     <div class="row">
       <div class="pill">Score: <span id="score">0</span></div>
       <div class="pill">Best: <span id="best">0</span></div>
+      <div class="pill">Lives: <span id="lives">2</span></div>
       <button id="restart">Restart</button>
     </div>
   </main>
@@ -33,6 +50,7 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
+const livesEl = document.getElementById('lives');
 const restartBtn = document.getElementById('restart');
 
 const W = canvas.width, H = canvas.height;
@@ -40,61 +58,160 @@ let keys = new Set();
 let running = true;
 let score = 0;
 let best = Number(localStorage.getItem('meteor_dodge_best') || 0);
+let lives = 2;
+let invincibleTimer = 0;
 bestEl.textContent = best;
 
-const player = { x: W/2, y: H-48, w: 52, h: 16, speed: 430 };
+const player = { x: W / 2, y: H - 48, w: 52, h: 16, speed: 430 };
 let meteors = [];
+let particles = [];
 let spawnTimer = 0;
-let spawnGap = 0.85;
+let spawnGap = 0.9;
 let t = 0;
 
 function reset() {
   running = true;
   score = 0;
-  player.x = W/2;
+  lives = 2;
+  invincibleTimer = 0;
+  player.x = W / 2;
   meteors = [];
+  particles = [];
   spawnTimer = 0;
-  spawnGap = 0.85;
+  spawnGap = 0.9;
   t = 0;
+  scoreEl.textContent = '0';
+  livesEl.textContent = lives;
 }
 
-function rand(a,b){ return Math.random()*(b-a)+a; }
+function rand(a, b) { return Math.random() * (b - a) + a; }
+
+function makeMeteorShape(type, r) {
+  if (type === 'circle') return { r };
+  if (type === 'diamond') {
+    return {
+      pts: [
+        { x: 0, y: -r * 1.1 },
+        { x: r * 0.9, y: 0 },
+        { x: 0, y: r * 1.1 },
+        { x: -r * 0.9, y: 0 }
+      ]
+    };
+  }
+  const points = Math.floor(rand(5, 8));
+  const pts = [];
+  for (let i = 0; i < points; i++) {
+    const a = (i / points) * Math.PI * 2;
+    const rr = r * rand(0.62, 1.08);
+    pts.push({ x: Math.cos(a) * rr, y: Math.sin(a) * rr });
+  }
+  return { pts };
+}
 
 function spawnMeteor() {
-  const r = rand(9, 24);
-  meteors.push({ x: rand(r, W-r), y: -30, r, vy: rand(120, 260) + t*8, vx: rand(-20,20) });
+  const r = rand(10, 26);
+  const typeRoll = Math.random();
+  const shapeType = typeRoll < 0.45 ? 'circle' : typeRoll < 0.75 ? 'rock' : 'diamond';
+
+  // Difficulty ramps up continuously with time
+  const speedBoost = Math.min(260, t * 14);
+  const driftBoost = Math.min(85, t * 3.8);
+
+  meteors.push({
+    x: rand(r, W - r),
+    y: -35,
+    r,
+    vy: rand(110, 220) + speedBoost,
+    vx: rand(-30, 30) + rand(-driftBoost, driftBoost),
+    spin: rand(-2.2, 2.2),
+    rot: rand(0, Math.PI * 2),
+    type: shapeType,
+    shape: makeMeteorShape(shapeType === 'rock' ? 'rock' : shapeType, r),
+    hue: rand(12, 42)
+  });
 }
 
 function hitRectCircle(rx, ry, rw, rh, cx, cy, cr) {
   const nx = Math.max(rx, Math.min(cx, rx + rw));
   const ny = Math.max(ry, Math.min(cy, ry + rh));
   const dx = cx - nx, dy = cy - ny;
-  return dx*dx + dy*dy <= cr*cr;
+  return dx * dx + dy * dy <= cr * cr;
+}
+
+function addExplosion(x, y, color = '#ff9f62') {
+  for (let i = 0; i < 14; i++) {
+    particles.push({
+      x, y,
+      vx: rand(-130, 130),
+      vy: rand(-130, 130),
+      life: rand(0.2, 0.45),
+      age: 0,
+      size: rand(2, 5),
+      color
+    });
+  }
 }
 
 function update(dt) {
   if (!running) return;
   t += dt;
-  if (keys.has('ArrowLeft') || keys.has('a')) player.x -= player.speed*dt;
-  if (keys.has('ArrowRight') || keys.has('d')) player.x += player.speed*dt;
-  player.x = Math.max(player.w/2, Math.min(W-player.w/2, player.x));
+  if (invincibleTimer > 0) invincibleTimer -= dt;
 
+  if (keys.has('ArrowLeft') || keys.has('a')) player.x -= player.speed * dt;
+  if (keys.has('ArrowRight') || keys.has('d')) player.x += player.speed * dt;
+  player.x = Math.max(player.w / 2, Math.min(W - player.w / 2, player.x));
+
+  // Gets harder over time: faster spawn + occasional burst waves
   spawnTimer += dt;
-  spawnGap = Math.max(0.25, 0.85 - t*0.015);
-  while (spawnTimer >= spawnGap) { spawnTimer -= spawnGap; spawnMeteor(); }
+  spawnGap = Math.max(0.2, 0.9 - t * 0.014);
+  while (spawnTimer >= spawnGap) {
+    spawnTimer -= spawnGap;
+    spawnMeteor();
+
+    // Burst chance increases with time
+    const burstChance = Math.min(0.35, 0.06 + t * 0.0025);
+    if (Math.random() < burstChance) spawnMeteor();
+  }
 
   for (const m of meteors) {
     m.y += m.vy * dt;
     m.x += m.vx * dt;
-    if (m.x < m.r || m.x > W - m.r) m.vx *= -1;
-    if (hitRectCircle(player.x-player.w/2, player.y-player.h/2, player.w, player.h, m.x, m.y, m.r)) {
-      running = false;
+    m.rot += m.spin * dt;
+
+    if (m.x < m.r || m.x > W - m.r) {
+      m.vx *= -1;
+      m.x = Math.max(m.r, Math.min(W - m.r, m.x));
+    }
+
+    if (invincibleTimer <= 0 && hitRectCircle(player.x - player.w / 2, player.y - player.h / 2, player.w, player.h, m.x, m.y, m.r * 0.92)) {
+      lives -= 1;
+      livesEl.textContent = lives;
+      invincibleTimer = 1.0;
+      addExplosion(player.x, player.y - 2, '#6ecbff');
+
+      // remove the meteor that hit the player
+      m.y = H + 100;
+
+      if (lives <= 0) {
+        running = false;
+      }
     }
   }
-  meteors = meteors.filter(m => m.y < H + 50);
+
+  meteors = meteors.filter(m => m.y < H + 60);
+
+  for (const p of particles) {
+    p.age += dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vx *= 0.98;
+    p.vy *= 0.98;
+  }
+  particles = particles.filter(p => p.age < p.life);
 
   score += dt * 10;
   scoreEl.textContent = Math.floor(score);
+
   if (score > best) {
     best = Math.floor(score);
     bestEl.textContent = best;
@@ -102,49 +219,98 @@ function update(dt) {
   }
 }
 
-function draw() {
-  ctx.clearRect(0,0,W,H);
+function drawMeteor(m) {
+  ctx.save();
+  ctx.translate(m.x, m.y);
+  ctx.rotate(m.rot);
 
-  // stars
-  for (let i=0;i<80;i++) {
-    const x = (i*97 % W);
-    const y = ((i*53 + performance.now()*0.02*(1+i%3)) % H);
-    ctx.fillStyle = `rgba(255,255,255,${0.2 + (i%5)*0.1})`;
-    ctx.fillRect(x, y, 2, 2);
-  }
+  const glow = ctx.createRadialGradient(-m.r * 0.3, -m.r * 0.35, 1, 0, 0, m.r * 1.25);
+  glow.addColorStop(0, `hsla(${m.hue}, 95%, 73%, 0.95)`);
+  glow.addColorStop(0.35, `hsla(${m.hue + 10}, 92%, 58%, 0.9)`);
+  glow.addColorStop(1, `hsla(${m.hue + 20}, 88%, 36%, 0.95)`);
+  ctx.fillStyle = glow;
 
-  // player
-  ctx.fillStyle = '#6ecbff';
-  ctx.fillRect(player.x-player.w/2, player.y-player.h/2, player.w, player.h);
-  ctx.fillStyle = '#a8e5ff';
-  ctx.fillRect(player.x-8, player.y-player.h/2-6, 16, 6);
-
-  // meteors
-  for (const m of meteors) {
-    const g = ctx.createRadialGradient(m.x-4,m.y-6,2,m.x,m.y,m.r);
-    g.addColorStop(0, '#ffd18a');
-    g.addColorStop(1, '#ff6a3a');
-    ctx.fillStyle = g;
+  if (m.type === 'circle') {
     ctx.beginPath();
-    ctx.arc(m.x,m.y,m.r,0,Math.PI*2);
+    ctx.arc(0, 0, m.r, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    const pts = m.shape.pts;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
     ctx.fill();
   }
 
+  // craters / highlights
+  ctx.globalAlpha = 0.26;
+  ctx.fillStyle = '#2f1b14';
+  for (let i = 0; i < 3; i++) {
+    const cx = rand(-m.r * 0.45, m.r * 0.45);
+    const cy = rand(-m.r * 0.45, m.r * 0.45);
+    const rr = rand(m.r * 0.12, m.r * 0.24);
+    ctx.beginPath();
+    ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // stars background
+  for (let i = 0; i < 95; i++) {
+    const x = (i * 97) % W;
+    const y = ((i * 53 + performance.now() * 0.02 * (1 + i % 3)) % H);
+    ctx.fillStyle = `rgba(255,255,255,${0.15 + (i % 5) * 0.09})`;
+    ctx.fillRect(x, y, 2, 2);
+  }
+
+  // player (blink while invincible)
+  if (invincibleTimer <= 0 || Math.floor(invincibleTimer * 12) % 2 === 0) {
+    ctx.fillStyle = '#6ecbff';
+    ctx.fillRect(player.x - player.w / 2, player.y - player.h / 2, player.w, player.h);
+    ctx.fillStyle = '#a8e5ff';
+    ctx.fillRect(player.x - 8, player.y - player.h / 2 - 6, 16, 6);
+  }
+
+  for (const m of meteors) drawMeteor(m);
+
+  for (const p of particles) {
+    const alpha = 1 - p.age / p.life;
+    ctx.fillStyle = p.color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+    if (!ctx.fillStyle.includes('rgba')) ctx.fillStyle = `rgba(255,170,120,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // subtle difficulty indicator
+  const level = 1 + Math.floor(t / 10);
+  ctx.fillStyle = 'rgba(255,255,255,.75)';
+  ctx.font = '14px system-ui';
+  ctx.textAlign = 'left';
+  ctx.fillText(`Difficulty Lv.${level}`, 12, 22);
+
   if (!running) {
-    ctx.fillStyle = 'rgba(0,0,0,.55)';
-    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = 'rgba(0,0,0,.56)';
+    ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 44px system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText('Game Over', W/2, H/2 - 10);
+    ctx.fillText('Game Over', W / 2, H / 2 - 14);
     ctx.font = '24px system-ui';
-    ctx.fillText(`Score: ${Math.floor(score)}  |  Press Restart`, W/2, H/2 + 30);
+    ctx.fillText(`Score: ${Math.floor(score)}  |  Press Restart`, W / 2, H / 2 + 28);
   }
 }
 
 let last = performance.now();
 function loop(now) {
-  const dt = Math.min(0.033, (now-last)/1000);
+  const dt = Math.min(0.033, (now - last) / 1000);
   last = now;
   update(dt);
   draw();
@@ -152,8 +318,18 @@ function loop(now) {
 }
 requestAnimationFrame(loop);
 
-addEventListener('keydown', e => keys.add(e.key.toLowerCase() === 'arrowleft' ? 'ArrowLeft' : e.key.toLowerCase() === 'arrowright' ? 'ArrowRight' : e.key.toLowerCase()));
-addEventListener('keyup', e => keys.delete(e.key.toLowerCase() === 'arrowleft' ? 'ArrowLeft' : e.key.toLowerCase() === 'arrowright' ? 'ArrowRight' : e.key.toLowerCase()));
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft') keys.add('ArrowLeft');
+  else if (k === 'arrowright') keys.add('ArrowRight');
+  else keys.add(k);
+});
+addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft') keys.delete('ArrowLeft');
+  else if (k === 'arrowright') keys.delete('ArrowRight');
+  else keys.delete(k);
+});
 restartBtn.onclick = reset;
 </script>
 </body>
