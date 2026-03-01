@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Begone Games</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: radial-gradient(circle at top, #1a2140 0%, #0c1022 55%, #060813 100%);
+      color: #f5f7ff;
+      padding: 24px;
+    }
+    .card {
+      width: min(760px, 95vw);
+      background: rgba(16, 23, 52, 0.9);
+      border: 1px solid #2d3a72;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.35);
+    }
+    h1 { margin: 0 0 8px; font-size: 32px; }
+    p { margin: 0 0 18px; opacity: .88; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+    a.game {
+      text-decoration: none;
+      color: #fff;
+      background: #111832;
+      border: 1px solid #314080;
+      border-radius: 12px;
+      padding: 14px;
+      display: block;
+      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    a.game:hover {
+      transform: translateY(-2px);
+      border-color: #4e63c7;
+      box-shadow: 0 10px 24px rgba(0,0,0,.35);
+    }
+    .name { font-weight: 700; margin-bottom: 6px; }
+    .desc { opacity: .82; font-size: 14px; line-height: 1.45; }
+    .footer { margin-top: 16px; font-size: 12px; opacity: .65; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>🎮 Begone Games</h1>
+    <p>Choose a game to start playing:</p>
+
+    <section class="grid">
+      <a class="game" href="WebGames/two-player-power-duel.html">
+        <div class="name">Two-Player Power Duel</div>
+        <div class="desc">Two players mash keys (A vs L). Push your opponent out of bounds to win.</div>
+      </a>
+
+      <a class="game" href="WebGames/red-light-green-light.html">
+        <div class="name">Red Light, Green Light</div>
+        <div class="desc">Move on green, freeze on red. Reach the finish line without getting caught.</div>
+      </a>
+
+      <a class="game" href="WebGames/survival-campfire-game.html">
+        <div class="name">Survival Campfire Game</div>
+        <div class="desc">Keep the fire alive and survive as long as possible by managing resources.</div>
+      </a>
+    </section>
+
+    <div class="footer">Hosted on Vercel • Auto-updates from GitHub after each sync</div>
+  </main>
+</body>
+</html>
