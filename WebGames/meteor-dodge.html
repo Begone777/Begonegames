@@ -187,7 +187,7 @@
     shakeDur = 0;
 
     boss = null;
-    bossNextScore = 250;
+    bossNextScore = randInt(1500, 2001);
     bossWaveMsg = 0;
 
     showHitboxes = false;
@@ -240,7 +240,8 @@
 
   function spawnBoss() {
     const level = 1 + Math.floor(score / 2200);
-    const hp = Math.min(320, 105 + level * 26);
+    const earlyEase = level <= 2 ? 0.72 : 1;
+    const hp = Math.min(320, (105 + level * 26) * earlyEase);
     boss = {
       x: W / 2,
       y: -110,
@@ -250,12 +251,12 @@
       level,
       enterV: 68,
       dir: Math.random() > 0.5 ? 1 : -1,
-      speed: 85 + level * 8,
+      speed: (85 + level * 8) * earlyEase,
       hitFlash: 0,
       attackTimer: 0,
-      attackGap: rand(1.0, 2.0),
-      minGap: Math.max(0.42, 1.02 - level * 0.08),
-      volley: Math.min(4, 1 + Math.floor(level / 2))
+      attackGap: level <= 2 ? rand(1.35, 2.2) : rand(1.0, 2.0),
+      minGap: level <= 2 ? Math.max(0.62, 1.18 - level * 0.08) : Math.max(0.42, 1.02 - level * 0.08),
+      volley: level <= 2 ? 1 : Math.min(4, 1 + Math.floor(level / 2))
     };
     meteors.length = 0;
     bossWaveMsg = 3.2;
@@ -367,7 +368,7 @@
 
     if (!boss && scoreInt >= bossNextScore) {
       spawnBoss();
-      bossNextScore += randInt(2000, 2501); // subsequent bosses keep normal cadence
+      bossNextScore += randInt(1500, 2001);
     }
 
     if (!boss) {
@@ -426,7 +427,8 @@
             });
           }
         }
-        boss.attackGap = Math.max(boss.minGap, boss.attackGap - (0.03 + boss.level * 0.003));
+        const ramp = boss.level <= 2 ? 0.018 : (0.03 + boss.level * 0.003);
+        boss.attackGap = Math.max(boss.minGap, boss.attackGap - ramp);
       }
 
       if (hitRectCircle(player.x-18, player.y-20, 36, 40, boss.x, boss.y, boss.r*0.82)) hitPlayer();
