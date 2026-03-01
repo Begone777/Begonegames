@@ -206,6 +206,10 @@
       shakeT -= dt;
       const tNorm = Math.max(0, shakeT / Math.max(0.001, shakeDur));
       shakeP = 12 * tNorm;
+      if (shakeT <= 0) {
+        shakeT = 0;
+        shakeP = 0;
+      }
     } else {
       shakeP = 0;
     }
@@ -256,8 +260,8 @@
       m.y += m.vy * dt * slow;
       m.x += m.vx * dt * slow;
       m.rot += m.spin * dt * slow;
-      m.trail.push({ x: m.x, y: m.y, r: m.r * 0.72 });
-      if (m.trail.length > 7) m.trail.shift();
+      m.trail.push({ x: m.x, y: m.y, r: m.r * 0.95 });
+      if (m.trail.length > 10) m.trail.shift();
       if (m.x < -m.r) m.x = W + m.r;
       if (m.x > W + m.r) m.x = -m.r;
       if (hitRectCircle(player.x-18, player.y-20, 36, 40, m.x, m.y, m.r*0.9)) {
@@ -394,8 +398,8 @@
     else ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0,0,W,H);
 
-    const sx = shakeT > 0 ? rand(-shakeP, shakeP) : 0;
-    const sy = shakeT > 0 ? rand(-shakeP, shakeP) : 0;
+    const sx = shakeP > 0.1 ? rand(-shakeP, shakeP) : 0;
+    const sy = shakeP > 0.1 ? rand(-shakeP, shakeP) : 0;
 
     ctx.save();
     ctx.translate(sx, sy);
@@ -430,9 +434,13 @@
       for (let i = 0; i < m.trail.length; i++) {
         const tp = m.trail[i];
         const a = (i + 1) / m.trail.length;
-        ctx.fillStyle = `rgba(255,160,90,${a * 0.11})`;
+        const g = ctx.createRadialGradient(tp.x, tp.y, 0, tp.x, tp.y, tp.r * (0.7 + a));
+        g.addColorStop(0, `rgba(255,220,120,${a * 0.26})`);
+        g.addColorStop(0.6, `rgba(255,150,80,${a * 0.22})`);
+        g.addColorStop(1, 'rgba(255,110,70,0)');
+        ctx.fillStyle = g;
         ctx.beginPath();
-        ctx.arc(tp.x, tp.y, tp.r * a, 0, Math.PI * 2);
+        ctx.arc(tp.x, tp.y, tp.r * (0.45 + a * 0.75), 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -532,10 +540,10 @@
       ctx.strokeRect(player.x-18, player.y-20, 36, 40);
 
       // meteor hitboxes
-      ctx.strokeStyle = 'rgba(255,190,130,0.98)';
+      ctx.strokeStyle = 'rgba(120,255,150,0.98)';
       ctx.lineWidth = 2;
       for (const m of meteors) {
-        ctx.fillStyle = 'rgba(255,150,100,0.12)';
+        ctx.fillStyle = 'rgba(80,255,130,0.14)';
         ctx.beginPath();
         ctx.arc(m.x, m.y, m.r*0.9, 0, Math.PI*2);
         ctx.fill();
