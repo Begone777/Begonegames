@@ -100,6 +100,13 @@
 
   function spawnMeteor() {
     const r = rand(10,24);
+    const points = [];
+    const count = 10;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      const rr = r * rand(0.86, 1.05);
+      points.push({ a, rr });
+    }
     meteors.push({
       x: rand(r, W-r),
       y: -30,
@@ -108,7 +115,8 @@
       vy: rand(120,220) + Math.min(320, t*15),
       rot: rand(0, Math.PI*2),
       spin: rand(-1.4,1.4),
-      hue: rand(12, 36)
+      hue: rand(12, 36),
+      points
     });
   }
 
@@ -124,7 +132,7 @@
     lives--;
     livesEl.textContent = String(lives);
     invincible = 1.0;
-    shakeT = 0.28;
+    shakeT = 2.0;
     shakeP = 10;
     for (let i=0;i<12;i++) particles.push({x:player.x,y:player.y,vx:rand(-120,120),vy:rand(-120,120),a:0,l:rand(.2,.45),s:rand(2,5),c:'rgba(110,203,255,1)'});
     if (lives <= 0) running = false;
@@ -157,7 +165,11 @@
     if (extraLifeMsg > 0) extraLifeMsg -= dt;
     if (waveActive > 0) waveActive -= dt;
     if (waveRing > 0) waveRing -= dt;
-    if (shakeT > 0) { shakeT -= dt; shakeP *= 0.9; }
+    if (shakeT > 0) {
+      shakeT -= dt;
+      const tNorm = Math.max(0, shakeT / 2.0);
+      shakeP = 10 * tNorm;
+    }
 
     waveCharge = Math.min(100, waveCharge + dt * 6); // slower charge
     waveEl.textContent = `${Math.floor(waveCharge)}%`;
@@ -228,16 +240,20 @@
   }
 
   function drawBackground() {
+    const mapOffsetY = bgY;
+    const mapOffsetX = bgY * 0.08;
+
     for (let i=0;i<95;i++) {
-      const x = (i*97)%W;
-      const y = ((i*53 + bgY*(0.6 + (i%3)*0.22))%(H+10)) - 5;
+      const x = ((i*97 + mapOffsetX*(0.4 + (i%3)*0.15))%(W+10)) - 5;
+      const y = ((i*53 + mapOffsetY*(0.6 + (i%3)*0.22))%(H+10)) - 5;
       ctx.fillStyle = `rgba(255,255,255,${0.14 + (i%5)*0.08})`;
       ctx.fillRect(x,y,2,2);
     }
 
     for (const p of planets) {
-      const py = ((p.y + bgY*p.v) % (H + p.r*3)) - p.r*1.5;
-      const px = ((p.x + bgY*p.v*0.12) % (W + p.r*3)) - p.r*1.5;
+      // planets follow the same world drift as the map, just slower
+      const py = ((p.y + mapOffsetY * (0.22 + p.v * 0.45)) % (H + p.r*3)) - p.r*1.5;
+      const px = ((p.x + mapOffsetX * (0.35 + p.v * 0.5)) % (W + p.r*3)) - p.r*1.5;
       const g = ctx.createRadialGradient(px-p.r*0.35, py-p.r*0.35, 1, px, py, p.r);
       g.addColorStop(0, p.c1); g.addColorStop(1, p.c2);
       ctx.globalAlpha = 0.3;
@@ -320,7 +336,18 @@
       const g = ctx.createRadialGradient(-m.r*0.3,-m.r*0.35,1,0,0,m.r*1.25);
       g.addColorStop(0,`hsla(${m.hue},95%,73%,0.95)`); g.addColorStop(0.35,`hsla(${m.hue+10},92%,58%,0.9)`); g.addColorStop(1,`hsla(${m.hue+20},88%,36%,0.95)`);
       ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(0,0,m.r,0,Math.PI*2); ctx.fill();
+
+      const pts = m.points.map(p => ({ x: Math.cos(p.a) * p.rr, y: Math.sin(p.a) * p.rr }));
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const p0 = pts[i], p1 = pts[(i + 1) % pts.length];
+        const mx = (p0.x + p1.x) * 0.5, my = (p0.y + p1.y) * 0.5;
+        if (i === 0) ctx.moveTo(mx, my);
+        else ctx.quadraticCurveTo(p0.x, p0.y, mx, my);
+      }
+      ctx.closePath();
+      ctx.fill();
+
       ctx.restore();
     }
 
