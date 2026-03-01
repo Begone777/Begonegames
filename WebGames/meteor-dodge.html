@@ -495,15 +495,15 @@
 
       // continents (stylized but closer to Earth look)
       const continents = [
-        { ox: -0.36, oy: -0.12, rx: 0.18, ry: 0.12, rot: -0.45 },
-        { ox: -0.08, oy: -0.28, rx: 0.12, ry: 0.08, rot: 0.15 },
-        { ox: 0.18, oy: -0.18, rx: 0.17, ry: 0.11, rot: 0.52 },
-        { ox: 0.36, oy: 0.02, rx: 0.13, ry: 0.09, rot: -0.22 },
-        { ox: -0.24, oy: 0.16, rx: 0.15, ry: 0.1, rot: -0.08 },
-        { ox: 0.02, oy: 0.22, rx: 0.19, ry: 0.11, rot: 0.24 },
-        { ox: 0.28, oy: 0.24, rx: 0.1, ry: 0.07, rot: 0.12 },
-        { ox: -0.42, oy: 0.3, rx: 0.08, ry: 0.05, rot: -0.35 },
-        { ox: 0.44, oy: -0.3, rx: 0.07, ry: 0.045, rot: 0.18 }
+        { ox: -0.46, oy: -0.18, rx: 0.15, ry: 0.1, rot: -0.36, rough: [1, 0.84, 1.12, 0.9, 1.06, 0.8, 1.1] },
+        { ox: -0.12, oy: -0.34, rx: 0.11, ry: 0.07, rot: 0.1, rough: [1, 1.08, 0.82, 1.05, 0.9, 1.12, 0.86] },
+        { ox: 0.22, oy: -0.2, rx: 0.14, ry: 0.09, rot: 0.52, rough: [1, 0.88, 1.1, 0.84, 1.06, 0.9, 1.04] },
+        { ox: 0.5, oy: -0.02, rx: 0.1, ry: 0.065, rot: -0.16, rough: [1, 1.1, 0.86, 1.04, 0.82, 1.08, 0.92] },
+        { ox: -0.3, oy: 0.12, rx: 0.13, ry: 0.085, rot: -0.08, rough: [1, 0.86, 1.14, 0.82, 1.05, 0.9, 1.02] },
+        { ox: 0.02, oy: 0.24, rx: 0.14, ry: 0.085, rot: 0.24, rough: [1, 1.12, 0.88, 1.05, 0.86, 1.08, 0.9] },
+        { ox: 0.34, oy: 0.28, rx: 0.09, ry: 0.06, rot: 0.16, rough: [1, 0.9, 1.08, 0.84, 1.12, 0.88, 1.04] },
+        { ox: -0.56, oy: 0.3, rx: 0.06, ry: 0.04, rot: -0.32, rough: [1, 1.1, 0.85, 1.08, 0.9, 1.06] },
+        { ox: 0.6, oy: -0.3, rx: 0.055, ry: 0.035, rot: 0.18, rough: [1, 0.86, 1.12, 0.9, 1.04, 0.88] }
       ];
       ctx.save();
       ctx.beginPath();
@@ -512,19 +512,27 @@
       for (const c of continents) {
         ctx.save();
         ctx.translate(earthX + radius * c.ox, earthY + radius * c.oy);
-        ctx.rotate(c.rot + Math.sin(t * 0.1 + c.ox * 3) * 0.03);
-        const cg = ctx.createRadialGradient(0, 0, 1, 0, 0, radius * c.rx * 1.2);
-        cg.addColorStop(0, 'rgba(104,188,102,0.95)');
-        cg.addColorStop(1, 'rgba(44,128,72,0.92)');
+        ctx.rotate(c.rot + Math.sin(t * 0.09 + c.ox * 2.2) * 0.02);
+        const cg = ctx.createRadialGradient(0, 0, 1, 0, 0, radius * c.rx * 1.25);
+        cg.addColorStop(0, 'rgba(110,194,108,0.95)');
+        cg.addColorStop(1, 'rgba(42,122,70,0.92)');
         ctx.fillStyle = cg;
         ctx.beginPath();
-        ctx.ellipse(0, 0, radius * c.rx, radius * c.ry, 0, 0, Math.PI * 2);
+        const n = c.rough.length;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2;
+          const rr = c.rough[i];
+          const px = Math.cos(a) * radius * c.rx * rr;
+          const py = Math.sin(a) * radius * c.ry * rr;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
         ctx.fill();
         ctx.restore();
       }
 
       // cloud swirls + cloud patches
-      ctx.globalAlpha = 0.66;
+      ctx.globalAlpha = 0.5;
       ctx.strokeStyle = 'rgba(255,255,255,0.98)';
       ctx.lineWidth = Math.max(2.5, radius * 0.032);
       ctx.beginPath();
