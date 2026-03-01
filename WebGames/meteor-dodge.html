@@ -740,15 +740,69 @@
     if (boss) {
       ctx.save();
       ctx.translate(boss.x, boss.y);
-      const bg = ctx.createRadialGradient(-boss.r*0.28,-boss.r*0.3,1,0,0,boss.r*1.2);
-      bg.addColorStop(0, boss.hitFlash > 0 ? 'rgba(255,250,220,0.98)' : 'rgba(255,204,130,0.96)');
-      bg.addColorStop(0.42, 'rgba(230,122,66,0.96)');
-      bg.addColorStop(1, 'rgba(110,48,28,0.98)');
-      ctx.fillStyle = bg;
-      ctx.beginPath(); ctx.arc(0,0,boss.r,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,235,205,0.3)';
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(-10,-12,boss.r*0.68,0.2,2.7); ctx.stroke();
+
+      // fighter-jet-ish UFO body
+      const hull = ctx.createLinearGradient(-boss.r,0,boss.r,0);
+      hull.addColorStop(0, boss.hitFlash > 0 ? 'rgba(255,255,255,0.95)' : 'rgba(164,182,214,0.95)');
+      hull.addColorStop(0.5, boss.hitFlash > 0 ? 'rgba(255,248,222,0.98)' : 'rgba(103,132,178,0.98)');
+      hull.addColorStop(1, boss.hitFlash > 0 ? 'rgba(255,255,255,0.95)' : 'rgba(75,96,136,0.95)');
+      ctx.fillStyle = hull;
+      ctx.beginPath();
+      ctx.moveTo(-boss.r*0.98, boss.r*0.08);
+      ctx.quadraticCurveTo(-boss.r*0.45, -boss.r*0.5, 0, -boss.r*0.6);
+      ctx.quadraticCurveTo(boss.r*0.45, -boss.r*0.5, boss.r*0.98, boss.r*0.08);
+      ctx.quadraticCurveTo(boss.r*0.42, boss.r*0.5, 0, boss.r*0.4);
+      ctx.quadraticCurveTo(-boss.r*0.42, boss.r*0.5, -boss.r*0.98, boss.r*0.08);
+      ctx.closePath();
+      ctx.fill();
+
+      // canopy
+      const canopy = ctx.createRadialGradient(-boss.r*0.08,-boss.r*0.34,1,0,-boss.r*0.2,boss.r*0.5);
+      canopy.addColorStop(0, 'rgba(214,245,255,0.95)');
+      canopy.addColorStop(1, 'rgba(104,175,235,0.35)');
+      ctx.fillStyle = canopy;
+      ctx.beginPath();
+      ctx.ellipse(0, -boss.r*0.2, boss.r*0.38, boss.r*0.24, 0, Math.PI, 0, true);
+      ctx.closePath();
+      ctx.fill();
+
+      // wings
+      ctx.fillStyle = 'rgba(70,94,140,0.9)';
+      ctx.beginPath();
+      ctx.moveTo(-boss.r*0.3, -boss.r*0.02);
+      ctx.lineTo(-boss.r*1.16, boss.r*0.26);
+      ctx.lineTo(-boss.r*0.4, boss.r*0.18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(boss.r*0.3, -boss.r*0.02);
+      ctx.lineTo(boss.r*1.16, boss.r*0.26);
+      ctx.lineTo(boss.r*0.4, boss.r*0.18);
+      ctx.closePath();
+      ctx.fill();
+
+      // nose + engine glow
+      ctx.fillStyle = 'rgba(235,245,255,0.95)';
+      ctx.beginPath();
+      ctx.ellipse(0, -boss.r*0.54, boss.r*0.15, boss.r*0.08, 0, 0, Math.PI*2);
+      ctx.fill();
+
+      const eng = ctx.createRadialGradient(0,boss.r*0.18,1,0,boss.r*0.18,boss.r*0.44);
+      eng.addColorStop(0, 'rgba(120,225,255,0.9)');
+      eng.addColorStop(1, 'rgba(40,140,220,0)');
+      ctx.fillStyle = eng;
+      ctx.beginPath();
+      ctx.ellipse(0, boss.r*0.2, boss.r*0.5, boss.r*0.24, 0, 0, Math.PI*2);
+      ctx.fill();
+
+      // trim
+      ctx.strokeStyle = 'rgba(230,244,255,0.45)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-boss.r*0.68, boss.r*0.05);
+      ctx.quadraticCurveTo(0, -boss.r*0.34, boss.r*0.68, boss.r*0.05);
+      ctx.stroke();
+
       ctx.restore();
 
       const barW = 260;
