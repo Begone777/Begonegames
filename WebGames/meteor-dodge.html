@@ -26,8 +26,8 @@
       <div class="pill">Best: <span id="best">0</span></div>
       <div class="pill">Lives: <span id="lives">2</span></div>
       <div class="pill">Wave: <span id="wave">0%</span></div>
-      <button id="lowDetail">Low Detail: Off</button>
-      <button id="hitboxes">Hitboxes: Off</button>
+      <button id="lowDetail">Low Detail (L): Off</button>
+      <button id="hitboxes">Hitboxes (H): Off</button>
       <button id="restart">Restart</button>
     </div>
   </main>
@@ -101,10 +101,10 @@
     bossWaveMsg = 0;
 
     showHitboxes = false;
-    hitboxesBtn.textContent = 'Hitboxes: Off';
+    hitboxesBtn.textContent = 'Hitboxes (H): Off';
 
     lowDetail = false;
-    lowDetailBtn.textContent = 'Low Detail: Off';
+    lowDetailBtn.textContent = 'Low Detail (L): Off';
 
     player.x = W/2;
     player.tilt = 0;
@@ -609,7 +609,18 @@
     if (k === ' ') { triggerWave(); return; }
     if (k === 'h') {
       showHitboxes = !showHitboxes;
-      hitboxesBtn.textContent = `Hitboxes: ${showHitboxes ? 'On' : 'Off'}`;
+      hitboxesBtn.textContent = `Hitboxes (H): ${showHitboxes ? 'On' : 'Off'}`;
+      return;
+    }
+    if (k === 'l') {
+      lowDetail = !lowDetail;
+      lowDetailBtn.textContent = `Low Detail (L): ${lowDetail ? 'On' : 'Off'}`;
+      if (lowDetail) {
+        flames.length = 0;
+        for (const m of meteors) m.trail.length = 0;
+        shakeT = 0;
+        shakeP = 0;
+      }
       return;
     }
     if (k === 'arrowleft') keys.add('ArrowLeft');
@@ -626,7 +637,7 @@
 
   lowDetailBtn.onclick = () => {
     lowDetail = !lowDetail;
-    lowDetailBtn.textContent = `Low Detail: ${lowDetail ? 'On' : 'Off'}`;
+    lowDetailBtn.textContent = `Low Detail (L): ${lowDetail ? 'On' : 'Off'}`;
     if (lowDetail) {
       flames.length = 0;
       for (const m of meteors) m.trail.length = 0;
@@ -637,7 +648,7 @@
 
   hitboxesBtn.onclick = () => {
     showHitboxes = !showHitboxes;
-    hitboxesBtn.textContent = `Hitboxes: ${showHitboxes ? 'On' : 'Off'}`;
+    hitboxesBtn.textContent = `Hitboxes (H): ${showHitboxes ? 'On' : 'Off'}`;
   };
 
   restartBtn.onclick = reset;
