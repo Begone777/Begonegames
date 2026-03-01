@@ -471,9 +471,10 @@
       const orbitDrift = Math.sin(t * 0.18) * 24;
       const intro = earthIntro.active ? Math.min(1, earthIntro.timer / earthIntro.duration) : 1;
       const eased = 1 - Math.pow(1 - intro, 2.2);
+      const postIntroFall = Math.max(0, t - earthIntro.duration) * (H * 0.06);
       const radius = H * 0.72;
       const earthX = W * 0.5 + orbitDrift;
-      const earthY = (H * 0.72) + eased * (H * 0.62);
+      const earthY = (H * 0.72) + eased * (H * 0.62) + postIntroFall;
 
       const g = ctx.createRadialGradient(
         earthX - radius * 0.34,
