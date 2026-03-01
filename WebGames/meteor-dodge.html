@@ -35,7 +35,7 @@
 <body>
   <main class="wrap">
     <h1>☄️ Meteor Dodge</h1>
-    <p>Move with ← → (or A / D). You have <strong>2 lives</strong>. Survive as long as you can.</p>
+    <p>Move with ← → (or A / D). You have <strong>2 lives</strong>. Gain extra lives as your score climbs (max 4).</p>
     <canvas id="game" width="900" height="520"></canvas>
     <div class="row">
       <div class="pill">Score: <span id="score">0</span></div>
@@ -60,13 +60,16 @@ let score = 0;
 let best = Number(localStorage.getItem('meteor_dodge_best') || 0);
 let lives = 2;
 let invincibleTimer = 0;
+let extraLifeBannerTimer = 0;
+let nextLifeScore = 540;
 bestEl.textContent = best;
 
-const player = { x: W / 2, y: H - 48, w: 52, h: 16, speed: 430 };
+const MAX_LIVES = 4;
+const player = { x: W / 2, y: H - 50, w: 58, h: 24, speed: 430 };
 let meteors = [];
 let particles = [];
 let spawnTimer = 0;
-let spawnGap = 0.9;
+let spawnGap = 0.92;
 let t = 0;
 
 function reset() {
@@ -74,11 +77,13 @@ function reset() {
   score = 0;
   lives = 2;
   invincibleTimer = 0;
+  extraLifeBannerTimer = 0;
+  nextLifeScore = Math.floor(rand(500, 601));
   player.x = W / 2;
   meteors = [];
   particles = [];
   spawnTimer = 0;
-  spawnGap = 0.9;
+  spawnGap = 0.92;
   t = 0;
   scoreEl.textContent = '0';
   livesEl.textContent = lives;
@@ -86,48 +91,46 @@ function reset() {
 
 function rand(a, b) { return Math.random() * (b - a) + a; }
 
-function makeMeteorShape(type, r) {
-  if (type === 'circle') return { r };
-  if (type === 'diamond') {
-    return {
-      pts: [
-        { x: 0, y: -r * 1.1 },
-        { x: r * 0.9, y: 0 },
-        { x: 0, y: r * 1.1 },
-        { x: -r * 0.9, y: 0 }
-      ]
-    };
+function makeSmoothMeteorShape(type, r) {
+  if (type === 'circle') {
+    return { points: Array.from({ length: 18 }, (_, i) => ({
+      a: (i / 18) * Math.PI * 2,
+      rr: r * rand(0.9, 1.03)
+    })) };
   }
-  const points = Math.floor(rand(5, 8));
-  const pts = [];
-  for (let i = 0; i < points; i++) {
-    const a = (i / points) * Math.PI * 2;
-    const rr = r * rand(0.62, 1.08);
-    pts.push({ x: Math.cos(a) * rr, y: Math.sin(a) * rr });
+
+  // Smoother rounded rock silhouettes (less spiky)
+  const count = type === 'diamond' ? 8 : 10;
+  const points = [];
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2;
+    const rrBase = type === 'diamond' ? r * (i % 2 ? 0.92 : 1.02) : r;
+    const rr = rrBase * rand(0.88, 1.05);
+    points.push({ a, rr });
   }
-  return { pts };
+  return { points };
 }
 
 function spawnMeteor() {
-  const r = rand(10, 26);
+  const r = rand(11, 26);
   const typeRoll = Math.random();
-  const shapeType = typeRoll < 0.45 ? 'circle' : typeRoll < 0.75 ? 'rock' : 'diamond';
+  const shapeType = typeRoll < 0.42 ? 'circle' : typeRoll < 0.78 ? 'rock' : 'diamond';
 
   // Difficulty ramps up continuously with time
-  const speedBoost = Math.min(260, t * 14);
-  const driftBoost = Math.min(85, t * 3.8);
+  const speedBoost = Math.min(300, t * 15.5);
+  const driftBoost = Math.min(95, t * 3.2);
 
   meteors.push({
     x: rand(r, W - r),
-    y: -35,
+    y: -45,
     r,
-    vy: rand(110, 220) + speedBoost,
-    vx: rand(-30, 30) + rand(-driftBoost, driftBoost),
-    spin: rand(-2.2, 2.2),
+    vy: rand(120, 230) + speedBoost,
+    vx: rand(-26, 26) + rand(-driftBoost, driftBoost),
+    spin: rand(-1.5, 1.5),
     rot: rand(0, Math.PI * 2),
-    type: shapeType,
-    shape: makeMeteorShape(shapeType === 'rock' ? 'rock' : shapeType, r),
-    hue: rand(12, 42)
+    shape: makeSmoothMeteorShape(shapeType, r),
+    hue: rand(12, 42),
+    craterSeed: [rand(0, 1), rand(0, 1), rand(0, 1)]
   });
 }
 
@@ -152,10 +155,39 @@ function addExplosion(x, y, color = '#ff9f62') {
   }
 }
 
+function drawRoundedMeteorPath(m) {
+  const pts = m.shape.points;
+  const xy = pts.map(p => ({ x: Math.cos(p.a) * p.rr, y: Math.sin(p.a) * p.rr }));
+
+  ctx.beginPath();
+  for (let i = 0; i < xy.length; i++) {
+    const p0 = xy[i];
+    const p1 = xy[(i + 1) % xy.length];
+    const mx = (p0.x + p1.x) * 0.5;
+    const my = (p0.y + p1.y) * 0.5;
+    if (i === 0) ctx.moveTo(mx, my);
+    else ctx.quadraticCurveTo(p0.x, p0.y, mx, my);
+  }
+  ctx.closePath();
+}
+
+function maybeAwardLife(currentScoreInt) {
+  while (currentScoreInt >= nextLifeScore) {
+    if (lives < MAX_LIVES) {
+      lives += 1;
+      livesEl.textContent = lives;
+      extraLifeBannerTimer = 1.8;
+      addExplosion(player.x, player.y - 16, '#9dffbe');
+    }
+    nextLifeScore += Math.floor(rand(500, 601));
+  }
+}
+
 function update(dt) {
   if (!running) return;
   t += dt;
   if (invincibleTimer > 0) invincibleTimer -= dt;
+  if (extraLifeBannerTimer > 0) extraLifeBannerTimer -= dt;
 
   if (keys.has('ArrowLeft') || keys.has('a')) player.x -= player.speed * dt;
   if (keys.has('ArrowRight') || keys.has('d')) player.x += player.speed * dt;
@@ -163,13 +195,12 @@ function update(dt) {
 
   // Gets harder over time: faster spawn + occasional burst waves
   spawnTimer += dt;
-  spawnGap = Math.max(0.2, 0.9 - t * 0.014);
+  spawnGap = Math.max(0.16, 0.92 - t * 0.015);
   while (spawnTimer >= spawnGap) {
     spawnTimer -= spawnGap;
     spawnMeteor();
 
-    // Burst chance increases with time
-    const burstChance = Math.min(0.35, 0.06 + t * 0.0025);
+    const burstChance = Math.min(0.42, 0.05 + t * 0.0028);
     if (Math.random() < burstChance) spawnMeteor();
   }
 
@@ -178,27 +209,21 @@ function update(dt) {
     m.x += m.vx * dt;
     m.rot += m.spin * dt;
 
-    if (m.x < m.r || m.x > W - m.r) {
-      m.vx *= -1;
-      m.x = Math.max(m.r, Math.min(W - m.r, m.x));
-    }
+    // NO horizontal bounce: wrap around screen edges
+    if (m.x < -m.r) m.x = W + m.r;
+    else if (m.x > W + m.r) m.x = -m.r;
 
-    if (invincibleTimer <= 0 && hitRectCircle(player.x - player.w / 2, player.y - player.h / 2, player.w, player.h, m.x, m.y, m.r * 0.92)) {
+    if (invincibleTimer <= 0 && hitRectCircle(player.x - player.w / 2, player.y - player.h / 2, player.w, player.h, m.x, m.y, m.r * 0.9)) {
       lives -= 1;
       livesEl.textContent = lives;
       invincibleTimer = 1.0;
       addExplosion(player.x, player.y - 2, '#6ecbff');
-
-      // remove the meteor that hit the player
       m.y = H + 100;
-
-      if (lives <= 0) {
-        running = false;
-      }
+      if (lives <= 0) running = false;
     }
   }
 
-  meteors = meteors.filter(m => m.y < H + 60);
+  meteors = meteors.filter(m => m.y < H + 70);
 
   for (const p of particles) {
     p.age += dt;
@@ -210,13 +235,62 @@ function update(dt) {
   particles = particles.filter(p => p.age < p.life);
 
   score += dt * 10;
-  scoreEl.textContent = Math.floor(score);
+  const scoreInt = Math.floor(score);
+  scoreEl.textContent = scoreInt;
+  maybeAwardLife(scoreInt);
 
   if (score > best) {
-    best = Math.floor(score);
+    best = scoreInt;
     bestEl.textContent = best;
     localStorage.setItem('meteor_dodge_best', String(best));
   }
+}
+
+function drawShip() {
+  ctx.save();
+  ctx.translate(player.x, player.y);
+
+  // Engine glow
+  const engineGlow = ctx.createRadialGradient(0, player.h * 0.85, 1, 0, player.h * 0.95, 24);
+  engineGlow.addColorStop(0, 'rgba(110,203,255,0.9)');
+  engineGlow.addColorStop(1, 'rgba(110,203,255,0)');
+  ctx.fillStyle = engineGlow;
+  ctx.beginPath();
+  ctx.ellipse(0, player.h * 0.95, 28, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hull body
+  const hull = ctx.createLinearGradient(-32, -8, 32, 18);
+  hull.addColorStop(0, '#7fd7ff');
+  hull.addColorStop(0.5, '#5ab8ff');
+  hull.addColorStop(1, '#2e87cc');
+  ctx.fillStyle = hull;
+  ctx.beginPath();
+  ctx.moveTo(0, -16);
+  ctx.quadraticCurveTo(26, -5, 24, 8);
+  ctx.quadraticCurveTo(0, 19, -24, 8);
+  ctx.quadraticCurveTo(-26, -5, 0, -16);
+  ctx.fill();
+
+  // Cockpit
+  const canopy = ctx.createLinearGradient(-7, -10, 7, 2);
+  canopy.addColorStop(0, '#d6f7ff');
+  canopy.addColorStop(1, '#7ecfff');
+  ctx.fillStyle = canopy;
+  ctx.beginPath();
+  ctx.ellipse(0, -6, 8, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wings
+  ctx.fillStyle = '#1e5e9a';
+  ctx.beginPath();
+  ctx.moveTo(-22, 6); ctx.lineTo(-34, 12); ctx.lineTo(-14, 12); ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(22, 6); ctx.lineTo(34, 12); ctx.lineTo(14, 12); ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
 }
 
 function drawMeteor(m) {
@@ -230,28 +304,21 @@ function drawMeteor(m) {
   glow.addColorStop(1, `hsla(${m.hue + 20}, 88%, 36%, 0.95)`);
   ctx.fillStyle = glow;
 
-  if (m.type === 'circle') {
-    ctx.beginPath();
-    ctx.arc(0, 0, m.r, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    const pts = m.shape.pts;
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.closePath();
-    ctx.fill();
-  }
+  drawRoundedMeteorPath(m);
+  ctx.fill();
 
-  // craters / highlights
-  ctx.globalAlpha = 0.26;
+  // stable crater details (no bouncing mini-balls)
+  ctx.globalAlpha = 0.22;
   ctx.fillStyle = '#2f1b14';
   for (let i = 0; i < 3; i++) {
-    const cx = rand(-m.r * 0.45, m.r * 0.45);
-    const cy = rand(-m.r * 0.45, m.r * 0.45);
-    const rr = rand(m.r * 0.12, m.r * 0.24);
+    const s = m.craterSeed[i];
+    const angle = s * Math.PI * 2;
+    const dist = m.r * (0.15 + (i * 0.15));
+    const cx = Math.cos(angle) * dist;
+    const cy = Math.sin(angle) * dist;
+    const rr = m.r * (0.14 + i * 0.03);
     ctx.beginPath();
-    ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, rr, rr * 0.75, angle * 0.3, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
@@ -262,7 +329,6 @@ function drawMeteor(m) {
 function draw() {
   ctx.clearRect(0, 0, W, H);
 
-  // stars background
   for (let i = 0; i < 95; i++) {
     const x = (i * 97) % W;
     const y = ((i * 53 + performance.now() * 0.02 * (1 + i % 3)) % H);
@@ -270,12 +336,8 @@ function draw() {
     ctx.fillRect(x, y, 2, 2);
   }
 
-  // player (blink while invincible)
   if (invincibleTimer <= 0 || Math.floor(invincibleTimer * 12) % 2 === 0) {
-    ctx.fillStyle = '#6ecbff';
-    ctx.fillRect(player.x - player.w / 2, player.y - player.h / 2, player.w, player.h);
-    ctx.fillStyle = '#a8e5ff';
-    ctx.fillRect(player.x - 8, player.y - player.h / 2 - 6, 16, 6);
+    drawShip();
   }
 
   for (const m of meteors) drawMeteor(m);
@@ -289,12 +351,23 @@ function draw() {
     ctx.fill();
   }
 
-  // subtle difficulty indicator
   const level = 1 + Math.floor(t / 10);
   ctx.fillStyle = 'rgba(255,255,255,.75)';
   ctx.font = '14px system-ui';
   ctx.textAlign = 'left';
   ctx.fillText(`Difficulty Lv.${level}`, 12, 22);
+
+  if (extraLifeBannerTimer > 0) {
+    const a = Math.min(1, extraLifeBannerTimer / 0.25);
+    ctx.fillStyle = `rgba(157,255,190,${0.2 + a * 0.35})`;
+    ctx.fillRect(W / 2 - 170, 16, 340, 42);
+    ctx.strokeStyle = `rgba(157,255,190,${0.6 + a * 0.3})`;
+    ctx.strokeRect(W / 2 - 170, 16, 340, 42);
+    ctx.fillStyle = `rgba(215,255,228,${0.8 + a * 0.2})`;
+    ctx.font = 'bold 22px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('✨ Extra Life Gained! +1', W / 2, 45);
+  }
 
   if (!running) {
     ctx.fillStyle = 'rgba(0,0,0,.56)';
