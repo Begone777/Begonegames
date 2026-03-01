@@ -445,7 +445,9 @@ function drawBackground() {
 }
 
 function draw() {
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // Cross-browser safe transform reset
+  if (typeof ctx.resetTransform === 'function') ctx.resetTransform();
+  else ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, W, H);
 
   const sx = shakeTimer > 0 ? rand(-shakePower, shakePower) : 0;
@@ -473,7 +475,8 @@ function draw() {
 
   for (const p of particles) {
     const alpha = 1 - p.age / p.life;
-    ctx.fillStyle = p.color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+    const base = (typeof p.color === 'string' && p.color) ? p.color : 'rgb(255,170,120)';
+    ctx.fillStyle = base.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
     if (!ctx.fillStyle.includes('rgba')) ctx.fillStyle = `rgba(255,170,120,${alpha})`;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
@@ -534,8 +537,13 @@ let last = performance.now();
 function loop(now) {
   const dt = Math.min(0.033, (now - last) / 1000);
   last = now;
-  update(dt);
-  draw();
+  try {
+    update(dt);
+    draw();
+  } catch (err) {
+    console.error('Meteor Dodge render error:', err);
+    // Keep loop alive instead of freezing on a black frame.
+  }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
