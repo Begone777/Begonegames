@@ -19,12 +19,13 @@
 <body>
   <main class="wrap">
     <h1>☄️ Meteor Dodge</h1>
-    <p>Move with ← → (or A / D). Survive meteors and laser lanes.</p>
+    <p>Move with ← → (or A / D). Press <strong>Space</strong> to release a slowing wave when charged.</p>
     <canvas id="game" width="900" height="520"></canvas>
     <div class="row">
       <div class="pill">Score: <span id="score">0</span></div>
       <div class="pill">Best: <span id="best">0</span></div>
       <div class="pill">Lives: <span id="lives">2</span></div>
+      <div class="pill">Wave: <span id="wave">0%</span></div>
       <button id="restart">Restart</button>
     </div>
   </main>
@@ -35,6 +36,7 @@ const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
 const livesEl = document.getElementById('lives');
+const waveEl = document.getElementById('wave');
 const restartBtn = document.getElementById('restart');
 
 const W = canvas.width, H = canvas.height;
@@ -50,6 +52,15 @@ let nextLifeScore = 540;
 let laserTimer = 0;
 let lasers = [];
 let t = 0;
+let bgScroll = 0;
+
+// Wave skill
+let waveCharge = 0;
+const WAVE_CHARGE_MAX = 100;
+let waveActiveTimer = 0;
+let waveRingTimer = 0;
+let wavePulseTextTimer = 0;
+
 bestEl.textContent = best;
 
 const player = { x: W / 2, y: H - 52, w: 44, h: 72, speed: 430, tilt: 0, tiltTarget: 0 };
@@ -57,6 +68,12 @@ let meteors = [];
 let particles = [];
 let spawnTimer = 0;
 let spawnGap = 0.92;
+
+const planets = [
+  { x: 140, y: 110, r: 42, colorA: '#6d74ff', colorB: '#2e317a', speed: 0.12 },
+  { x: 690, y: 180, r: 28, colorA: '#ffc78a', colorB: '#9d5f2f', speed: 0.18 },
+  { x: 460, y: 70, r: 18, colorA: '#8ff0c9', colorB: '#2f7d61', speed: 0.1 }
+];
 
 function rand(a, b) { return Math.random() * (b - a) + a; }
 
@@ -74,11 +91,17 @@ function reset() {
   particles = [];
   lasers = [];
   laserTimer = 0;
+  waveCharge = 0;
+  waveActiveTimer = 0;
+  waveRingTimer = 0;
+  wavePulseTextTimer = 0;
   spawnTimer = 0;
   spawnGap = 0.92;
   t = 0;
+  bgScroll = 0;
   scoreEl.textContent = '0';
   livesEl.textContent = lives;
+  waveEl.textContent = '0%';
 }
 
 function makeSmoothMeteorShape(type, r) {
@@ -137,9 +160,7 @@ function hitPlayer() {
 }
 
 function addExplosion(x, y, color = '#ff9f62') {
-  for (let i = 0; i < 14; i++) {
-    particles.push({ x, y, vx: rand(-130,130), vy: rand(-130,130), life: rand(0.2,0.45), age:0, size: rand(2,5), color });
-  }
+  for (let i = 0; i < 14; i++) particles.push({ x, y, vx: rand(-130,130), vy: rand(-130,130), life: rand(0.2,0.45), age:0, size: rand(2,5), color });
 }
 
 function maybeAwardLife(scoreInt) {
@@ -156,14 +177,35 @@ function maybeAwardLife(scoreInt) {
 
 function spawnLaserLane() {
   const x = rand(70, W - 70);
-  lasers.push({ x, warn: 0.9, fire: 2.1, width: 14 }); // ~3s total cadence managed by timer
+  lasers.push({ x, warn: 0.9, fire: 2.1, width: 14 });
+}
+
+function triggerWave() {
+  if (waveCharge < WAVE_CHARGE_MAX || waveActiveTimer > 0) return;
+  waveCharge = 0;
+  waveActiveTimer = 3.5;
+  waveRingTimer = 0.8;
+  wavePulseTextTimer = 1.2;
 }
 
 function update(dt) {
   if (!running) return;
   t += dt;
+  bgScroll += dt * 18; // slower than foreground hazards
+
   if (invincibleTimer > 0) invincibleTimer -= dt;
   if (extraLifeBannerTimer > 0) extraLifeBannerTimer -= dt;
+  if (waveActiveTimer > 0) waveActiveTimer -= dt;
+  if (waveRingTimer > 0) waveRingTimer -= dt;
+  if (wavePulseTextTimer > 0) wavePulseTextTimer -= dt;
+
+  const waveActive = waveActiveTimer > 0;
+  const slowFactor = waveActive ? 0.58 : 1;
+  const spawnFactor = waveActive ? 0.72 : 1;
+
+  // charge wave slowly
+  waveCharge = Math.min(WAVE_CHARGE_MAX, waveCharge + dt * 12);
+  waveEl.textContent = `${Math.floor(waveCharge)}%`;
 
   // Movement + tilt
   let dir = 0;
@@ -176,18 +218,18 @@ function update(dt) {
 
   // Meteors harder over time
   spawnTimer += dt;
-  spawnGap = Math.max(0.16, 0.92 - t * 0.015);
+  spawnGap = Math.max(0.16, (0.92 - t * 0.015) / spawnFactor);
   while (spawnTimer >= spawnGap) {
     spawnTimer -= spawnGap;
     spawnMeteor();
-    const burstChance = Math.min(0.42, 0.05 + t * 0.0028);
+    const burstChance = Math.min(0.42, 0.05 + t * 0.0028) * spawnFactor;
     if (Math.random() < burstChance) spawnMeteor();
   }
 
   for (const m of meteors) {
-    m.y += m.vy * dt;
-    m.x += m.vx * dt;
-    m.rot += m.spin * dt;
+    m.y += m.vy * dt * slowFactor;
+    m.x += m.vx * dt * slowFactor;
+    m.rot += m.spin * dt * slowFactor;
     if (m.x < -m.r) m.x = W + m.r;
     else if (m.x > W + m.r) m.x = -m.r;
     if (hitRectCircle(player.x - 18, player.y - 20, 36, 40, m.x, m.y, m.r * 0.9)) {
@@ -197,9 +239,9 @@ function update(dt) {
   }
   meteors = meteors.filter(m => m.y < H + 70);
 
-  // Lasers start at score 2000, every 3 seconds, fixed lanes (not targeting player)
+  // Lasers start at 1000 now
   const scoreInt = Math.floor(score);
-  if (scoreInt >= 2000) {
+  if (scoreInt >= 1000) {
     laserTimer += dt;
     while (laserTimer >= 3) {
       laserTimer -= 3;
@@ -255,7 +297,6 @@ function drawRocket() {
   ctx.closePath();
   ctx.fill();
 
-  // Rocket body
   const body = ctx.createLinearGradient(-14, -20, 14, 20);
   body.addColorStop(0, '#d8e8ff');
   body.addColorStop(0.55, '#89b8ff');
@@ -268,27 +309,19 @@ function drawRocket() {
   ctx.quadraticCurveTo(-14, -8, 0, -24);
   ctx.fill();
 
-  // Nose cone
   ctx.fillStyle = '#ff7f6a';
   ctx.beginPath();
-  ctx.moveTo(0, -28);
-  ctx.lineTo(6, -20);
-  ctx.lineTo(-6, -20);
-  ctx.closePath();
+  ctx.moveTo(0, -28); ctx.lineTo(6, -20); ctx.lineTo(-6, -20); ctx.closePath();
   ctx.fill();
 
-  // Window
   ctx.fillStyle = '#dff8ff';
   ctx.beginPath();
   ctx.arc(0, -7, 5, 0, Math.PI * 2);
   ctx.fill();
 
-  // Fins
   ctx.fillStyle = '#2a5395';
-  ctx.beginPath();
-  ctx.moveTo(-10, 10); ctx.lineTo(-18, 17); ctx.lineTo(-8, 16); ctx.closePath(); ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(10, 10); ctx.lineTo(18, 17); ctx.lineTo(8, 16); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-10, 10); ctx.lineTo(-18, 17); ctx.lineTo(-8, 16); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(10, 10); ctx.lineTo(18, 17); ctx.lineTo(8, 16); ctx.closePath(); ctx.fill();
 
   ctx.restore();
 }
@@ -305,7 +338,6 @@ function drawMeteor(m) {
   drawRoundedMeteorPath(m);
   ctx.fill();
 
-  // fixed crater shading only
   ctx.globalAlpha = 0.22;
   ctx.fillStyle = '#2f1b14';
   for (let i = 0; i < 3; i++) {
@@ -325,15 +357,12 @@ function drawMeteor(m) {
 
 function drawLasers() {
   for (const l of lasers) {
-    const isWarn = l.warn > 0;
-    if (isWarn) {
+    if (l.warn > 0) {
       ctx.strokeStyle = 'rgba(255,90,90,0.55)';
       ctx.lineWidth = 2;
       ctx.setLineDash([8, 8]);
       ctx.beginPath();
-      ctx.moveTo(l.x, 0);
-      ctx.lineTo(l.x, H);
-      ctx.stroke();
+      ctx.moveTo(l.x, 0); ctx.lineTo(l.x, H); ctx.stroke();
       ctx.setLineDash([]);
     } else {
       const beam = ctx.createLinearGradient(l.x, 0, l.x, H);
@@ -343,22 +372,43 @@ function drawLasers() {
       ctx.strokeStyle = beam;
       ctx.lineWidth = l.width;
       ctx.beginPath();
-      ctx.moveTo(l.x, 0);
-      ctx.lineTo(l.x, H);
-      ctx.stroke();
+      ctx.moveTo(l.x, 0); ctx.lineTo(l.x, H); ctx.stroke();
     }
+  }
+}
+
+function drawBackground() {
+  // moving stars
+  for (let i = 0; i < 95; i++) {
+    const x = (i * 97) % W;
+    const y = ((i * 53 + bgScroll * (0.6 + (i % 3) * 0.22)) % (H + 10)) - 5;
+    ctx.fillStyle = `rgba(255,255,255,${0.15 + (i % 5) * 0.09})`;
+    ctx.fillRect(x, y, 2, 2);
+  }
+
+  // slow parallax planets
+  for (const p of planets) {
+    const py = ((p.y + bgScroll * p.speed) % (H + p.r * 3)) - p.r * 1.5;
+    const grad = ctx.createRadialGradient(p.x - p.r * 0.35, py - p.r * 0.35, 1, p.x, py, p.r);
+    grad.addColorStop(0, p.colorA);
+    grad.addColorStop(1, p.colorB);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(p.x, py, p.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.2;
+    ctx.strokeStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(p.x, py, p.r * 1.2, 0.3, 2.7);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 }
 
 function draw() {
   ctx.clearRect(0, 0, W, H);
-  for (let i = 0; i < 95; i++) {
-    const x = (i * 97) % W;
-    const y = ((i * 53 + performance.now() * 0.02 * (1 + i % 3)) % H);
-    ctx.fillStyle = `rgba(255,255,255,${0.15 + (i % 5) * 0.09})`;
-    ctx.fillRect(x, y, 2, 2);
-  }
-
+  drawBackground();
   drawLasers();
 
   if (invincibleTimer <= 0 || Math.floor(invincibleTimer * 12) % 2 === 0) drawRocket();
@@ -373,11 +423,29 @@ function draw() {
     ctx.fill();
   }
 
+  // wave ring visual
+  if (waveRingTimer > 0) {
+    const prog = 1 - waveRingTimer / 0.8;
+    const r = prog * 460;
+    ctx.strokeStyle = `rgba(110,203,255,${0.8 - prog * 0.75})`;
+    ctx.lineWidth = 8 - prog * 5;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   const level = 1 + Math.floor(t / 10);
   ctx.fillStyle = 'rgba(255,255,255,.75)';
   ctx.font = '14px system-ui';
   ctx.textAlign = 'left';
   ctx.fillText(`Difficulty Lv.${level}`, 12, 22);
+
+  if (wavePulseTextTimer > 0) {
+    ctx.fillStyle = 'rgba(160,220,255,0.95)';
+    ctx.font = 'bold 20px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('🌊 Slow Wave Activated!', W / 2, 80);
+  }
 
   if (extraLifeBannerTimer > 0) {
     const a = Math.min(1, extraLifeBannerTimer / 0.25);
@@ -415,6 +483,7 @@ requestAnimationFrame(loop);
 
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
+  if (k === ' ') { triggerWave(); return; }
   if (k === 'arrowleft') keys.add('ArrowLeft');
   else if (k === 'arrowright') keys.add('ArrowRight');
   else keys.add(k);
