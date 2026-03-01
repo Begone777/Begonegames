@@ -433,7 +433,7 @@
       const eased = 1 - Math.pow(1 - intro, 2.2);
       const radius = (H * 0.72) - eased * (H * 0.52);
       const earthX = W * 0.5 + orbitDrift;
-      const earthY = (H * 1.07) - eased * (H * 0.62);
+      const earthY = (H * 0.72) + eased * (H * 0.62);
 
       const g = ctx.createRadialGradient(
         earthX - radius * 0.36,
@@ -443,9 +443,10 @@
         earthY,
         radius
       );
-      g.addColorStop(0, 'rgba(173,225,255,0.95)');
-      g.addColorStop(0.35, 'rgba(70,160,230,0.95)');
-      g.addColorStop(1, 'rgba(15,55,110,0.96)');
+      g.addColorStop(0, 'rgba(176,232,196,0.96)');
+      g.addColorStop(0.38, 'rgba(82,181,132,0.96)');
+      g.addColorStop(0.72, 'rgba(56,132,188,0.95)');
+      g.addColorStop(1, 'rgba(18,58,112,0.96)');
       ctx.globalAlpha = 0.9;
       ctx.fillStyle = g;
       ctx.beginPath();
@@ -453,8 +454,8 @@
       ctx.fill();
 
       // cloud bands
-      ctx.globalAlpha = 0.28;
-      ctx.strokeStyle = 'rgba(230,245,255,0.95)';
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = 'rgba(255,255,255,0.98)';
       ctx.lineWidth = Math.max(2, radius * 0.03);
       ctx.beginPath();
       ctx.arc(earthX - radius * 0.08, earthY - radius * 0.02, radius * 0.72, 0.4, 2.65);
@@ -464,8 +465,8 @@
       ctx.stroke();
 
       // atmosphere rim
-      ctx.globalAlpha = 0.2;
-      ctx.strokeStyle = 'rgba(125,206,255,0.95)';
+      ctx.globalAlpha = 0.26;
+      ctx.strokeStyle = 'rgba(196,235,255,0.95)';
       ctx.lineWidth = Math.max(3, radius * 0.04);
       ctx.beginPath();
       ctx.arc(earthX, earthY, radius * 1.02, Math.PI * 0.97, Math.PI * 1.98);
