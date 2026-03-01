@@ -232,7 +232,9 @@
     if (waveRing > 0) waveRing -= dt;
     if (bossWaveMsg > 0) bossWaveMsg -= dt;
 
-    waveCharge = Math.min(100, waveCharge + dt * 2); // 1% every 0.5s
+    const laserActiveNow = lasers.length > 0;
+    const waveChargeRate = laserActiveNow ? 4 : 2; // normal: 1%/0.5s, with lasers: 2%/0.5s
+    waveCharge = Math.min(100, waveCharge + dt * waveChargeRate);
     waveEl.textContent = `${Math.floor(waveCharge)}%`;
 
     let dir = 0;
