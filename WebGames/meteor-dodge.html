@@ -26,6 +26,7 @@
       <div class="pill">Best: <span id="best">0</span></div>
       <div class="pill">Lives: <span id="lives">2</span></div>
       <div class="pill">Wave: <span id="wave">0%</span></div>
+      <button id="lowDetail">Low Detail: Off</button>
       <button id="hitboxes">Hitboxes: Off</button>
       <button id="restart">Restart</button>
     </div>
@@ -39,6 +40,7 @@
   const bestEl = document.getElementById('best');
   const livesEl = document.getElementById('lives');
   const waveEl = document.getElementById('wave');
+  const lowDetailBtn = document.getElementById('lowDetail');
   const hitboxesBtn = document.getElementById('hitboxes');
   const restartBtn = document.getElementById('restart');
 
@@ -54,7 +56,7 @@
   let waveCharge, waveActive, waveRing;
   let shakeT, shakeP, shakeDur;
   let boss, bossNextScore, bossWaveMsg;
-  let showHitboxes;
+  let showHitboxes, lowDetail;
 
   const player = { x: W/2, y: H-52, speed: 420, tilt:0, tiltTarget:0 };
 
@@ -100,6 +102,9 @@
 
     showHitboxes = false;
     hitboxesBtn.textContent = 'Hitboxes: Off';
+
+    lowDetail = false;
+    lowDetailBtn.textContent = 'Low Detail: Off';
 
     player.x = W/2;
     player.tilt = 0;
@@ -202,7 +207,10 @@
   }
 
   function update(dt) {
-    if (shakeT > 0) {
+    if (lowDetail) {
+      shakeT = 0;
+      shakeP = 0;
+    } else if (shakeT > 0) {
       shakeT -= dt;
       const tNorm = Math.max(0, shakeT / Math.max(0.001, shakeDur));
       shakeP = 12 * tNorm;
@@ -236,7 +244,9 @@
     player.tilt += (player.tiltTarget - player.tilt) * Math.min(1, dt * 11);
 
     // flame trail
-    for (let i=0;i<2;i++) flames.push({x:player.x+rand(-4,4),y:player.y+14,vx:rand(-20,20),vy:rand(70,130),a:0,l:rand(.2,.45),s:rand(3,6)});
+    if (!lowDetail) {
+      for (let i=0;i<2;i++) flames.push({x:player.x+rand(-4,4),y:player.y+14,vx:rand(-20,20),vy:rand(70,130),a:0,l:rand(.2,.45),s:rand(3,6)});
+    }
 
     const slow = waveActive > 0 ? 0.58 : 1;
     const spawnMul = waveActive > 0 ? 0.72 : 1;
@@ -260,8 +270,12 @@
       m.y += m.vy * dt * slow;
       m.x += m.vx * dt * slow;
       m.rot += m.spin * dt * slow;
-      m.trail.push({ x: m.x, y: m.y, r: m.r * 0.95 });
-      if (m.trail.length > 10) m.trail.shift();
+      if (!lowDetail) {
+        m.trail.push({ x: m.x, y: m.y, r: m.r * 0.95 });
+        if (m.trail.length > 10) m.trail.shift();
+      } else if (m.trail.length) {
+        m.trail.length = 0;
+      }
       if (m.x < -m.r) m.x = W + m.r;
       if (m.x > W + m.r) m.x = -m.r;
       if (hitRectCircle(player.x-18, player.y-20, 36, 40, m.x, m.y, m.r*0.9)) {
@@ -404,7 +418,7 @@
     ctx.save();
     ctx.translate(sx, sy);
 
-    drawBackground();
+    if (!lowDetail) drawBackground();
 
     for (const l of lasers) {
       if (l.warn > 0) {
@@ -418,30 +432,34 @@
       }
     }
 
-    for (const f of flames) {
-      const a = 1 - f.a/f.l;
-      const g = ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.s*2);
-      g.addColorStop(0, `rgba(255,230,140,${0.75*a})`);
-      g.addColorStop(0.6, `rgba(255,120,60,${0.6*a})`);
-      g.addColorStop(1, 'rgba(255,60,40,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(f.x,f.y,f.s*(0.7+a),0,Math.PI*2); ctx.fill();
+    if (!lowDetail) {
+      for (const f of flames) {
+        const a = 1 - f.a/f.l;
+        const g = ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.s*2);
+        g.addColorStop(0, `rgba(255,230,140,${0.75*a})`);
+        g.addColorStop(0.6, `rgba(255,120,60,${0.6*a})`);
+        g.addColorStop(1, 'rgba(255,60,40,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(f.x,f.y,f.s*(0.7+a),0,Math.PI*2); ctx.fill();
+      }
     }
 
     if (invincible <= 0 || Math.floor(invincible*12)%2===0) drawRocket();
 
-    for (const m of meteors) {
-      for (let i = 0; i < m.trail.length; i++) {
-        const tp = m.trail[i];
-        const a = (i + 1) / m.trail.length;
-        const g = ctx.createRadialGradient(tp.x, tp.y, 0, tp.x, tp.y, tp.r * (0.7 + a));
-        g.addColorStop(0, `rgba(255,220,120,${a * 0.26})`);
-        g.addColorStop(0.6, `rgba(255,150,80,${a * 0.22})`);
-        g.addColorStop(1, 'rgba(255,110,70,0)');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(tp.x, tp.y, tp.r * (0.45 + a * 0.75), 0, Math.PI * 2);
-        ctx.fill();
+    if (!lowDetail) {
+      for (const m of meteors) {
+        for (let i = 0; i < m.trail.length; i++) {
+          const tp = m.trail[i];
+          const a = (i + 1) / m.trail.length;
+          const g = ctx.createRadialGradient(tp.x, tp.y, 0, tp.x, tp.y, tp.r * (0.7 + a));
+          g.addColorStop(0, `rgba(255,220,120,${a * 0.26})`);
+          g.addColorStop(0.6, `rgba(255,150,80,${a * 0.22})`);
+          g.addColorStop(1, 'rgba(255,110,70,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(tp.x, tp.y, tp.r * (0.45 + a * 0.75), 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
 
@@ -603,6 +621,17 @@
     else if (k === 'arrowright') keys.delete('ArrowRight');
     else keys.delete(k);
   });
+
+  lowDetailBtn.onclick = () => {
+    lowDetail = !lowDetail;
+    lowDetailBtn.textContent = `Low Detail: ${lowDetail ? 'On' : 'Off'}`;
+    if (lowDetail) {
+      flames.length = 0;
+      for (const m of meteors) m.trail.length = 0;
+      shakeT = 0;
+      shakeP = 0;
+    }
+  };
 
   hitboxesBtn.onclick = () => {
     showHitboxes = !showHitboxes;
