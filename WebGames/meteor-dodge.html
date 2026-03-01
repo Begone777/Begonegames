@@ -14,6 +14,42 @@
     .row { display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:10px; flex-wrap:wrap; }
     .pill { padding:6px 10px; border:1px solid #2b335c; border-radius:999px; background:#111735; }
     button { background:#4f7cff; color:#fff; border:0; border-radius:10px; padding:8px 12px; cursor:pointer; font-weight:700; }
+    .front-page {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle at 20% 20%, rgba(94,120,255,0.25), transparent 50%),
+                  radial-gradient(circle at 80% 80%, rgba(255,98,76,0.2), transparent 45%),
+                  rgba(2, 6, 16, 0.92);
+      backdrop-filter: blur(4px);
+      z-index: 20;
+    }
+    .front-page.hidden { display: none; }
+    .front-card {
+      width: min(860px, 92vw);
+      border: 1px solid #39457d;
+      border-radius: 18px;
+      padding: 20px;
+      background: linear-gradient(165deg, rgba(23,33,66,0.95), rgba(12,18,40,0.95));
+      box-shadow: 0 30px 70px rgba(0,0,0,.5);
+    }
+    .thumb {
+      height: min(45vh, 320px);
+      border-radius: 14px;
+      border: 1px solid rgba(117,136,219,0.5);
+      background: radial-gradient(circle at 52% 78%, rgba(120,230,255,0.2), transparent 32%),
+                  radial-gradient(circle at 80% 20%, rgba(255,133,84,0.25), transparent 28%),
+                  linear-gradient(180deg, #111a3d, #090f28 60%, #060b18);
+      display: grid;
+      place-items: center;
+      font-size: clamp(40px, 8vw, 78px);
+      letter-spacing: .06em;
+      text-shadow: 0 6px 24px rgba(0,0,0,.55);
+      margin-bottom: 14px;
+    }
+    .front-row { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    .start-btn { background: linear-gradient(135deg, #5f88ff, #47b2ff); font-size: 1rem; padding: 10px 18px; }
   </style>
 </head>
 <body>
@@ -28,9 +64,23 @@
       <div class="pill">Wave: <span id="wave">0%</span></div>
       <button id="lowDetail">Low Detail (L): Off</button>
       <button id="hitboxes">Hitboxes (H): Off</button>
+      <button id="fullscreen">Fullscreen</button>
       <button id="restart">Restart</button>
     </div>
   </main>
+
+  <div id="frontPage" class="front-page">
+    <div class="front-card">
+      <div class="thumb">☄️⚡🚀</div>
+      <div class="front-row">
+        <div>
+          <h2 style="margin:.1rem 0;">Meteor Dodge</h2>
+          <p style="margin:.2rem 0;opacity:.85;">Dodge meteors, survive laser storms, and smash your high score.</p>
+        </div>
+        <button id="startGame" class="start-btn">Start Game</button>
+      </div>
+    </div>
+  </div>
 
 <script>
 (() => {
@@ -42,7 +92,10 @@
   const waveEl = document.getElementById('wave');
   const lowDetailBtn = document.getElementById('lowDetail');
   const hitboxesBtn = document.getElementById('hitboxes');
+  const fullscreenBtn = document.getElementById('fullscreen');
   const restartBtn = document.getElementById('restart');
+  const frontPage = document.getElementById('frontPage');
+  const startGameBtn = document.getElementById('startGame');
 
   const W = canvas.width, H = canvas.height;
   const MAX_LIVES = 4;
@@ -56,7 +109,7 @@
   let waveCharge, waveActive, waveRing;
   let shakeT, shakeP, shakeDur;
   let boss, bossNextScore, bossWaveMsg;
-  let showHitboxes, lowDetail;
+  let showHitboxes, lowDetail, gameStarted;
 
   const player = { x: W/2, y: H-52, speed: 420, tilt:0, tiltTarget:0 };
 
@@ -70,7 +123,7 @@
   const randInt = (a,b)=>Math.floor(rand(a,b));
 
   function reset() {
-    running = true;
+    running = gameStarted;
     score = 0;
     lives = 2;
     invincible = 0;
@@ -114,6 +167,12 @@
     bestEl.textContent = best;
     livesEl.textContent = '2';
     waveEl.textContent = '0%';
+  }
+
+  function startGame() {
+    gameStarted = true;
+    frontPage.classList.add('hidden');
+    reset();
   }
 
   function spawnMeteor() {
@@ -222,7 +281,7 @@
       shakeP = 0;
     }
 
-    if (!running) return;
+    if (!gameStarted || !running) return;
     t += dt;
     bgY += dt * 30;
 
@@ -427,10 +486,25 @@
         ctx.strokeStyle='rgba(255,90,90,0.55)'; ctx.lineWidth=2; ctx.setLineDash([8,8]);
         ctx.beginPath(); ctx.moveTo(l.x,0); ctx.lineTo(l.x,H); ctx.stroke(); ctx.setLineDash([]);
       } else {
+        const surge = lowDetail ? 1 : (0.78 + Math.sin(performance.now() * 0.024 + l.x * 0.055) * 0.22);
+        const width = l.w * surge;
         const beam = ctx.createLinearGradient(l.x,0,l.x,H);
-        beam.addColorStop(0,'rgba(255,70,70,0.15)'); beam.addColorStop(0.5,'rgba(255,70,70,0.9)'); beam.addColorStop(1,'rgba(255,70,70,0.15)');
-        ctx.strokeStyle=beam; ctx.lineWidth=l.w;
+        beam.addColorStop(0,`rgba(255,70,70,${0.12 + surge*0.08})`);
+        beam.addColorStop(0.5,`rgba(255,70,70,${0.72 + surge*0.24})`);
+        beam.addColorStop(1,`rgba(255,70,70,${0.12 + surge*0.08})`);
+        ctx.strokeStyle=beam; ctx.lineWidth=width;
         ctx.beginPath(); ctx.moveTo(l.x,0); ctx.lineTo(l.x,H); ctx.stroke();
+
+        if (!lowDetail) {
+          const glowW = l.w * (2.1 + surge * 0.8);
+          const glow = ctx.createLinearGradient(l.x,0,l.x,H);
+          glow.addColorStop(0,'rgba(255,95,95,0)');
+          glow.addColorStop(0.5,`rgba(255,85,85,${0.26 + surge*0.18})`);
+          glow.addColorStop(1,'rgba(255,95,95,0)');
+          ctx.strokeStyle = glow;
+          ctx.lineWidth = glowW;
+          ctx.beginPath(); ctx.moveTo(l.x,0); ctx.lineTo(l.x,H); ctx.stroke();
+        }
       }
     }
 
@@ -587,7 +661,7 @@
       }
     }
 
-    if (!running) {
+    if (gameStarted && !running) {
       ctx.fillStyle='rgba(0,0,0,.56)'; ctx.fillRect(0,0,W,H);
       ctx.fillStyle='#fff'; ctx.font='bold 44px system-ui'; ctx.textAlign='center'; ctx.fillText('Game Over', W/2, H/2-14);
       ctx.font='24px system-ui'; ctx.fillText(`Score: ${Math.floor(score)}  |  Press Restart`, W/2, H/2+28);
@@ -606,6 +680,8 @@
 
   addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
+    if (k === 'f') { fullscreenBtn.click(); return; }
+    if (!gameStarted && k !== 'enter') return;
     if (k === ' ') { triggerWave(); return; }
     if (k === 'h') {
       showHitboxes = !showHitboxes;
@@ -651,7 +727,32 @@
     hitboxesBtn.textContent = `Hitboxes (H): ${showHitboxes ? 'On' : 'Off'}`;
   };
 
-  restartBtn.onclick = reset;
+  restartBtn.onclick = () => {
+    if (!gameStarted) startGame();
+    else reset();
+  };
+
+  fullscreenBtn.onclick = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+        fullscreenBtn.textContent = 'Exit Fullscreen';
+      } else {
+        await document.exitFullscreen();
+        fullscreenBtn.textContent = 'Fullscreen';
+      }
+    } catch (err) {
+      console.error('Fullscreen error:', err);
+    }
+  };
+
+  document.addEventListener('fullscreenchange', () => {
+    fullscreenBtn.textContent = document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen';
+  });
+
+  startGameBtn.onclick = startGame;
+
+  gameStarted = false;
   reset();
   requestAnimationFrame(loop);
 })();
