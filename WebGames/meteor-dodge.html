@@ -491,6 +491,8 @@
     const level = 1 + Math.floor(t/10);
     ctx.fillStyle='rgba(255,255,255,.75)'; ctx.font='14px system-ui'; ctx.textAlign='left';
     ctx.fillText(`Difficulty Lv.${level}`,12,22);
+    ctx.fillStyle='rgba(255,255,255,.65)';
+    ctx.fillText(`Hitboxes: ${showHitboxes ? 'On' : 'Off'} (H)`, 12, 42);
 
     if (waveActive > 0) { ctx.fillStyle='rgba(160,220,255,0.95)'; ctx.font='bold 20px system-ui'; ctx.textAlign='center'; ctx.fillText('🌊 Slow Wave Activated!', W/2, 80); }
     if (bossWaveMsg > 0) {
@@ -563,6 +565,11 @@
   addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
     if (k === ' ') { triggerWave(); return; }
+    if (k === 'h') {
+      showHitboxes = !showHitboxes;
+      hitboxesBtn.textContent = `Hitboxes: ${showHitboxes ? 'On' : 'Off'}`;
+      return;
+    }
     if (k === 'arrowleft') keys.add('ArrowLeft');
     else if (k === 'arrowright') keys.add('ArrowRight');
     else keys.add(k);
