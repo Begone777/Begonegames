@@ -35,18 +35,58 @@
       box-shadow: 0 30px 70px rgba(0,0,0,.5);
     }
     .thumb {
+      position: relative;
       height: min(45vh, 320px);
       border-radius: 14px;
       border: 1px solid rgba(117,136,219,0.5);
-      background: radial-gradient(circle at 52% 78%, rgba(120,230,255,0.2), transparent 32%),
-                  radial-gradient(circle at 80% 20%, rgba(255,133,84,0.25), transparent 28%),
-                  linear-gradient(180deg, #111a3d, #090f28 60%, #060b18);
-      display: grid;
-      place-items: center;
-      font-size: clamp(40px, 8vw, 78px);
-      letter-spacing: .06em;
-      text-shadow: 0 6px 24px rgba(0,0,0,.55);
+      background:
+        radial-gradient(circle at 22% 18%, rgba(255,255,255,0.2) 0 1px, transparent 2px),
+        radial-gradient(circle at 65% 32%, rgba(255,255,255,0.16) 0 1px, transparent 2px),
+        radial-gradient(circle at 82% 70%, rgba(255,255,255,0.14) 0 1px, transparent 2px),
+        linear-gradient(180deg, #111a3d, #090f28 60%, #060b18);
+      overflow: hidden;
       margin-bottom: 14px;
+      box-shadow: inset 0 -30px 80px rgba(0,0,0,.35);
+    }
+    .thumb::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: -58%;
+      width: 112%;
+      aspect-ratio: 1 / 1;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 42% 36%, rgba(255,255,255,0.55), rgba(255,255,255,0) 26%),
+        radial-gradient(circle at 58% 44%, rgba(44,161,92,0.95), rgba(44,161,92,0) 23%),
+        radial-gradient(circle at 36% 60%, rgba(76,188,118,0.9), rgba(76,188,118,0) 24%),
+        radial-gradient(circle at 66% 64%, rgba(77,138,217,0.9), rgba(77,138,217,0) 30%),
+        radial-gradient(circle at 50% 50%, #4a9ae0 0%, #2d6cbc 56%, #173f84 100%);
+      box-shadow: 0 0 35px rgba(120,200,255,0.35);
+    }
+    .thumb::after {
+      content: '☄️   ☄️   ⚡';
+      position: absolute;
+      top: 16%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: clamp(22px, 4vw, 38px);
+      letter-spacing: .18em;
+      text-shadow: 0 6px 20px rgba(0,0,0,.6);
+      opacity: 0.95;
+    }
+    .thumb-title {
+      position: absolute;
+      left: 50%;
+      bottom: 12%;
+      transform: translateX(-50%);
+      font-size: clamp(20px, 4vw, 34px);
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-shadow: 0 8px 24px rgba(0,0,0,.65);
+      color: #dff1ff;
+      white-space: nowrap;
     }
     .front-row { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
     .start-btn { background: linear-gradient(135deg, #5f88ff, #47b2ff); font-size: 1rem; padding: 10px 18px; }
@@ -71,7 +111,7 @@
 
   <div id="frontPage" class="front-page">
     <div class="front-card">
-      <div class="thumb">☄️⚡🚀</div>
+      <div class="thumb"><div class="thumb-title">METEOR DODGE</div></div>
       <div class="front-row">
         <div>
           <h2 style="margin:.1rem 0;">Meteor Dodge</h2>
@@ -436,38 +476,67 @@
       const earthY = (H * 0.72) + eased * (H * 0.62);
 
       const g = ctx.createRadialGradient(
-        earthX - radius * 0.36,
-        earthY - radius * 0.42,
+        earthX - radius * 0.34,
+        earthY - radius * 0.46,
         1,
         earthX,
         earthY,
         radius
       );
-      g.addColorStop(0, 'rgba(176,232,196,0.96)');
-      g.addColorStop(0.38, 'rgba(82,181,132,0.96)');
-      g.addColorStop(0.72, 'rgba(56,132,188,0.95)');
-      g.addColorStop(1, 'rgba(18,58,112,0.96)');
-      ctx.globalAlpha = 0.9;
+      g.addColorStop(0, 'rgba(190,230,255,0.96)');
+      g.addColorStop(0.34, 'rgba(78,156,226,0.96)');
+      g.addColorStop(0.74, 'rgba(34,91,170,0.95)');
+      g.addColorStop(1, 'rgba(10,42,92,0.98)');
+      ctx.globalAlpha = 0.95;
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(earthX, earthY, radius, 0, Math.PI * 2);
       ctx.fill();
 
-      // cloud bands
-      ctx.globalAlpha = 0.5;
+      // continents (stylized but closer to Earth look)
+      const continents = [
+        { ox: -0.22, oy: -0.08, rx: 0.26, ry: 0.16, rot: -0.35 },
+        { ox: 0.12, oy: 0.08, rx: 0.22, ry: 0.14, rot: 0.4 },
+        { ox: 0.01, oy: -0.24, rx: 0.16, ry: 0.1, rot: 0.1 },
+        { ox: -0.04, oy: 0.26, rx: 0.14, ry: 0.08, rot: -0.2 }
+      ];
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(earthX, earthY, radius, 0, Math.PI * 2);
+      ctx.clip();
+      for (const c of continents) {
+        ctx.save();
+        ctx.translate(earthX + radius * c.ox, earthY + radius * c.oy);
+        ctx.rotate(c.rot + Math.sin(t * 0.1 + c.ox * 3) * 0.03);
+        const cg = ctx.createRadialGradient(0, 0, 1, 0, 0, radius * c.rx * 1.2);
+        cg.addColorStop(0, 'rgba(104,188,102,0.95)');
+        cg.addColorStop(1, 'rgba(44,128,72,0.92)');
+        ctx.fillStyle = cg;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, radius * c.rx, radius * c.ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // cloud swirls
+      ctx.globalAlpha = 0.62;
       ctx.strokeStyle = 'rgba(255,255,255,0.98)';
-      ctx.lineWidth = Math.max(2, radius * 0.03);
+      ctx.lineWidth = Math.max(2.5, radius * 0.032);
       ctx.beginPath();
-      ctx.arc(earthX - radius * 0.08, earthY - radius * 0.02, radius * 0.72, 0.4, 2.65);
+      ctx.arc(earthX - radius * 0.06, earthY - radius * 0.02, radius * 0.74, 0.45, 2.7);
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(earthX + radius * 0.15, earthY + radius * 0.1, radius * 0.54, 0.2, 2.4);
+      ctx.arc(earthX + radius * 0.18, earthY + radius * 0.08, radius * 0.5, 0.18, 2.46);
       ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(earthX - radius * 0.22, earthY + radius * 0.2, radius * 0.34, 5.2, 1.7);
+      ctx.stroke();
+      ctx.restore();
 
       // atmosphere rim
-      ctx.globalAlpha = 0.26;
-      ctx.strokeStyle = 'rgba(196,235,255,0.95)';
-      ctx.lineWidth = Math.max(3, radius * 0.04);
+      ctx.globalAlpha = 0.3;
+      ctx.strokeStyle = 'rgba(198,236,255,0.98)';
+      ctx.lineWidth = Math.max(3, radius * 0.043);
       ctx.beginPath();
       ctx.arc(earthX, earthY, radius * 1.02, Math.PI * 0.97, Math.PI * 1.98);
       ctx.stroke();
