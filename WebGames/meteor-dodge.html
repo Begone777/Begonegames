@@ -26,6 +26,7 @@
       <div class="pill">Best: <span id="best">0</span></div>
       <div class="pill">Lives: <span id="lives">2</span></div>
       <div class="pill">Wave: <span id="wave">0%</span></div>
+      <button id="hitboxes">Hitboxes: Off</button>
       <button id="restart">Restart</button>
     </div>
   </main>
@@ -38,6 +39,7 @@
   const bestEl = document.getElementById('best');
   const livesEl = document.getElementById('lives');
   const waveEl = document.getElementById('wave');
+  const hitboxesBtn = document.getElementById('hitboxes');
   const restartBtn = document.getElementById('restart');
 
   const W = canvas.width, H = canvas.height;
@@ -52,6 +54,7 @@
   let waveCharge, waveActive, waveRing;
   let shakeT, shakeP;
   let boss, bossNextScore, bossWaveMsg;
+  let showHitboxes;
 
   const player = { x: W/2, y: H-52, speed: 420, tilt:0, tiltTarget:0 };
 
@@ -62,6 +65,7 @@
   ];
 
   const rand = (a,b)=>Math.random()*(b-a)+a;
+  const randInt = (a,b)=>Math.floor(rand(a,b));
 
   function reset() {
     running = true;
@@ -90,8 +94,11 @@
     shakeP = 0;
 
     boss = null;
-    bossNextScore = 1200;
+    bossNextScore = randInt(1500, 2001);
     bossWaveMsg = 0;
+
+    showHitboxes = false;
+    hitboxesBtn.textContent = 'Hitboxes: Off';
 
     player.x = W/2;
     player.tilt = 0;
@@ -153,7 +160,7 @@
     lives--;
     livesEl.textContent = String(lives);
     invincible = 1.0;
-    shakeT = 2.0;
+    shakeT = 4.0;
     shakeP = 10;
     for (let i=0;i<12;i++) particles.push({x:player.x,y:player.y,vx:rand(-120,120),vy:rand(-120,120),a:0,l:rand(.2,.45),s:rand(2,5),c:'rgba(110,203,255,1)'});
     if (lives <= 0) running = false;
@@ -198,7 +205,7 @@
     if (bossWaveMsg > 0) bossWaveMsg -= dt;
     if (shakeT > 0) {
       shakeT -= dt;
-      const tNorm = Math.max(0, shakeT / 2.0);
+      const tNorm = Math.max(0, shakeT / 4.0);
       shakeP = 10 * tNorm;
     }
 
@@ -222,7 +229,7 @@
 
     if (!boss && scoreInt >= bossNextScore) {
       spawnBoss();
-      bossNextScore += 1600;
+      bossNextScore += randInt(1500, 2001);
     }
 
     spawnTimer += dt;
@@ -505,6 +512,37 @@
       ctx.fillText('✨ Extra Life Gained! +1', W/2, 45);
     }
 
+    if (showHitboxes) {
+      // player hitbox
+      ctx.strokeStyle = 'rgba(120,220,255,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(player.x-18, player.y-20, 36, 40);
+
+      // meteor hitboxes
+      ctx.strokeStyle = 'rgba(255,170,110,0.7)';
+      for (const m of meteors) {
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, m.r*0.9, 0, Math.PI*2);
+        ctx.stroke();
+      }
+
+      // laser hitboxes
+      ctx.strokeStyle = 'rgba(255,90,90,0.7)';
+      for (const l of lasers) {
+        if (l.warn <= 0 && l.fire > 0) {
+          ctx.strokeRect(l.x - (l.w/2 + 14), 0, (l.w + 28), H);
+        }
+      }
+
+      // boss hitbox
+      if (boss) {
+        ctx.strokeStyle = 'rgba(255,215,140,0.9)';
+        ctx.beginPath();
+        ctx.arc(boss.x, boss.y, boss.r*0.82, 0, Math.PI*2);
+        ctx.stroke();
+      }
+    }
+
     if (!running) {
       ctx.fillStyle='rgba(0,0,0,.56)'; ctx.fillRect(0,0,W,H);
       ctx.fillStyle='#fff'; ctx.font='bold 44px system-ui'; ctx.textAlign='center'; ctx.fillText('Game Over', W/2, H/2-14);
@@ -536,6 +574,11 @@
     else if (k === 'arrowright') keys.delete('ArrowRight');
     else keys.delete(k);
   });
+
+  hitboxesBtn.onclick = () => {
+    showHitboxes = !showHitboxes;
+    hitboxesBtn.textContent = `Hitboxes: ${showHitboxes ? 'On' : 'Off'}`;
+  };
 
   restartBtn.onclick = reset;
   reset();
