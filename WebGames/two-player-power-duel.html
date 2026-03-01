@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Two-Player Power Duel</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      background: #0f1220;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+    }
+    .wrap {
+      width: min(900px, 94vw);
+      background: #171b2e;
+      border: 1px solid #2f365f;
+      border-radius: 16px;
+      padding: 22px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.35);
+    }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    p { margin: 6px 0; opacity: .9; }
+    .keys { display: flex; justify-content: space-between; margin: 16px 0 14px; gap: 12px; }
+    .card {
+      flex: 1;
+      background: #0f1326;
+      border: 1px solid #2b3359;
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .left strong { color: #6ecbff; }
+    .right strong { color: #ff8db3; }
+    .arena {
+      position: relative;
+      height: 120px;
+      border-radius: 12px;
+      border: 2px solid #2c3560;
+      background: linear-gradient(90deg, #162341 0%, #1f1b3d 50%, #3b1d2b 100%);
+      overflow: hidden;
+      margin: 12px 0 14px;
+    }
+    .edge {
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 14px;
+      background: rgba(255,255,255,.1);
+    }
+    .edge.left { left: 0; }
+    .edge.right { right: 0; }
+    .rope {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 4px;
+      transform: translateY(-50%);
+      background: rgba(255,255,255,.25);
+    }
+    .token {
+      position: absolute;
+      top: 50%;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      box-shadow: 0 0 0 6px rgba(255,255,255,.15);
+    }
+    .status {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+      font-size: 15px;
+    }
+    .badge {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #0f1326;
+      border: 1px solid #2b3359;
+    }
+    button {
+      margin-top: 14px;
+      border: 0;
+      background: #4f7cff;
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Two-Player Power Duel 💪</h1>
+    <p>Two players mash their keys. Faster tapping builds more power and pushes the opponent out of bounds.</p>
+    <p><strong>Rules:</strong> Left player presses <strong>A</strong>, right player presses <strong>L</strong>. The player pushed out of bounds <strong>loses</strong>.</p>
+
+    <div class="keys">
+      <div class="card left">
+        Left Player: <strong>A key</strong><br/>
+        Speed: <span id="cpsL">0.0</span> taps/sec
+      </div>
+      <div class="card right">
+        Right Player: <strong>L key</strong><br/>
+        Speed: <span id="cpsR">0.0</span> taps/sec
+      </div>
+    </div>
+
+    <div class="arena" id="arena">
+      <div class="edge left"></div>
+      <div class="edge right"></div>
+      <div class="rope"></div>
+      <div class="token" id="token"></div>
+    </div>
+
+    <div class="status">
+      <div class="badge">Left Power: <span id="forceL">0</span></div>
+      <div class="badge">Position: <span id="posText">0</span></div>
+      <div class="badge">Right Power: <span id="forceR">0</span></div>
+    </div>
+
+    <p id="msg">Start mashing when ready!</p>
+    <button id="restart">Restart</button>
+  </div>
+
+  <script>
+    const arena = document.getElementById('arena');
+    const token = document.getElementById('token');
+    const msg = document.getElementById('msg');
+    const forceLView = document.getElementById('forceL');
+    const forceRView = document.getElementById('forceR');
+    const cpsLView = document.getElementById('cpsL');
+    const cpsRView = document.getElementById('cpsR');
+    const posText = document.getElementById('posText');
+    const restartBtn = document.getElementById('restart');
+
+    let pos = 0; // -100 ~ +100
+    let forceL = 0;
+    let forceR = 0;
+    let ended = false;
+
+    const decay = 0.9;     // power decay
+    const gain = 1.8;      // gain per key press
+    const pushScale = 0.45; // convert power difference to movement
+
+    const hitsL = [];
+    const hitsR = [];
+
+    function now() { return performance.now(); }
+
+    function recordHit(arr) {
+      const t = now();
+      arr.push(t);
+      while (arr.length && t - arr[0] > 1000) arr.shift();
+    }
+
+    function cps(arr) {
+      const t = now();
+      while (arr.length && t - arr[0] > 1000) arr.shift();
+      return arr.length;
+    }
+
+    function updateUI() {
+      const w = arena.clientWidth;
+      const center = w / 2;
+      const x = center + (pos / 100) * (w / 2 - 14);
+      token.style.left = `${x}px`;
+
+      forceLView.textContent = forceL.toFixed(1);
+      forceRView.textContent = forceR.toFixed(1);
+      cpsLView.textContent = cps(hitsL).toFixed(1);
+      cpsRView.textContent = cps(hitsR).toFixed(1);
+      posText.textContent = pos.toFixed(1);
+    }
+
+    function endGame(winner) {
+      ended = true;
+      msg.textContent = winner === 'L' ? '🏆 🏆 Left player wins! Right player was pushed out of bounds.' : '🏆 🏆 Right player wins! Left player was pushed out of bounds.';
+    }
+
+    function tick() {
+      if (!ended) {
+        forceL *= decay;
+        forceR *= decay;
+
+        pos += (forceR - forceL) * pushScale;
+
+        if (pos <= -100) endGame('R');
+        if (pos >= 100) endGame('L');
+      }
+      updateUI();
+      requestAnimationFrame(tick);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (ended) return;
+      const k = e.key.toLowerCase();
+
+      if (k === 'a') {
+        forceL += gain;
+        recordHit(hitsL);
+      } else if (k === 'l') {
+        forceR += gain;
+        recordHit(hitsR);
+      }
+    });
+
+    restartBtn.addEventListener('click', () => {
+      pos = 0;
+      forceL = 0;
+      forceR = 0;
+      hitsL.length = 0;
+      hitsR.length = 0;
+      ended = false;
+      msg.textContent = 'Start mashing when ready!';
+      updateUI();
+    });
+
+    updateUI();
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>

@@ -1,0 +1,2054 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <title>Campfire Survival</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #000;
+      color: #fff;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: block;
+      padding: 0;
+      -webkit-user-select: none;
+      user-select: none;
+      overscroll-behavior: none;
+    }
+    .wrap {
+      width: 100vw;
+      height: 100dvh;
+      background: #000;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+      position: relative;
+      overflow: hidden;
+    }
+    h1 { display: none; }
+    .hud {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      z-index: 4;
+      display: grid;
+      grid-template-columns: repeat(8, minmax(90px, 1fr));
+      gap: 6px;
+      margin-bottom: 0;
+    }
+    .chip {
+      background: linear-gradient(180deg, #131c3a, #0f1732);
+      border: 1px solid #3a56a0;
+      border-radius: 10px;
+      padding: 8px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 14px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.07);
+    }
+    .hint { display: none; }
+    canvas {
+      width: 100vw;
+      height: 100dvh;
+      display: block;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      background: #1b2f1f;
+      object-fit: cover;
+    }
+    .actions {
+      position: fixed;
+      right: 12px;
+      bottom: 12px;
+      display: flex;
+      gap: 8px;
+      margin-top: 0;
+      flex-wrap: wrap;
+      z-index: 4;
+    }
+    .craft-panel {
+      margin-top: 10px;
+      border: 1px solid #3a56a0;
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(11,18,37,.98), rgba(8,14,28,.98));
+      padding: 10px;
+      font-size: 13px;
+    }
+    .craft-panel.hidden { display: none; }
+    .craft-title { font-weight: 800; margin-bottom: 6px; color: #cfe2ff; }
+    .craft-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+    .craft-row.sel { color: #ffe59b; }
+    .craft-cost.ok { color: #99f3b1; }
+    .craft-cost.no { color: #ffb3b3; }
+    button {
+      border: 0;
+      border-radius: 9px;
+      background: #4f7cff;
+      color: #fff;
+      padding: 9px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #restartBtn { background: #364066; }
+    .ios-device #fullscreenBtn { opacity: .55; }
+    .mobile-controls {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      display: none;
+      flex-direction: column-reverse;
+      align-items: flex-start;
+      gap: 10px;
+      z-index: 5;
+    }
+    .device-mobile .mobile-controls { display: flex; }
+    .joystick {
+      width: 140px;
+      height: 140px;
+      border-radius: 999px;
+      border: 2px solid #5d7bd4;
+      background: radial-gradient(circle at 30% 25%, #2b3e74, #1a2649);
+      position: relative;
+      touch-action: none;
+      user-select: none;
+    }
+    .joy-knob {
+      position: absolute;
+      width: 56px;
+      height: 56px;
+      left: 42px;
+      top: 42px;
+      border-radius: 999px;
+      background: #8fb1ff;
+      border: 2px solid #d9e5ff;
+      box-shadow: 0 4px 12px rgba(0,0,0,.35);
+      pointer-events: none;
+    }
+    .mobile-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(92px, 1fr));
+      gap: 8px;
+      width: min(250px, 66vw);
+      justify-items: stretch;
+    }
+    .mobile-actions button {
+      min-height: 44px;
+      font-size: 12px;
+      background: #2d3f76;
+    }
+    .start-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4,8,20,.86);
+      display: grid;
+      place-items: center;
+      z-index: 20;
+    }
+    .start-card {
+      width: min(520px, 92vw);
+      padding: 20px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #111b38, #0a1228);
+      border: 1px solid #3e61b3;
+      text-align: center;
+    }
+    .start-card h2 { margin: 0 0 8px; }
+    .start-card p { opacity: .9; margin: 0 0 14px; }
+    .start-actions { display: flex; gap: 10px; justify-content: center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Campfire Survival 🔥</h1>
+    <div class="hud">
+      <div class="chip">Time: <span id="phase">Day</span></div>
+      <div class="chip">Wood: <span id="wood">0</span></div>
+      <div class="chip">Fire: <span id="fire">Not built</span></div>
+      <div class="chip">Health: <span id="hp">100</span></div>
+      <div class="chip">Stone: <span id="stone">0</span></div>
+      <div class="chip">Traps: <span id="traps">0</span></div>
+      <div class="chip">Torch: <span id="torch">Off</span></div>
+      <div class="chip">Upgrades: <span id="upgrades">0</span></div>
+      <div class="chip">Energy: <span id="energy">100%</span></div>
+      <div class="chip">Nights Survived: <span id="score">0</span></div>
+    </div>
+    <div class="hint">
+      Move: <b>WASD / Arrow Keys</b> (or mobile joystick) · <b>E</b> = interact (tree/rock/camp) · <b>Q</b> trap · <b>T</b> torch · <b>C</b> craft menu.<br>
+      In craft menu: <b>↑/↓</b> select and <b>E/Enter</b> craft. Wall/Furniture require standing near Craft Station.
+    </div>
+    <canvas id="game" width="1240" height="760"></canvas>
+    <div class="actions">
+      <button id="restartBtn">Restart</button>
+      <button id="fullscreenBtn">Fullscreen</button>
+    </div>
+    <div class="mobile-controls">
+      <div id="joystick" class="joystick">
+        <div id="joyKnob" class="joy-knob"></div>
+      </div>
+      <div class="mobile-actions">
+        <button data-key="e">Interact</button>
+        <button data-key="fuel">Fuel Fire</button>
+        <button data-key="q">Place Trap</button>
+        <button data-key="t">Light Torch</button>
+        <button data-key="c">Craft Menu</button>
+        <button data-key="craft-up">Craft ▲</button>
+        <button data-key="craft-down">Craft ▼</button>
+        <button data-key="craft-make">Craft Item</button>
+        <button data-key="eat">Eat Food</button>
+        <button data-key="rulebook">Rulebook</button>
+      </div>
+    </div>
+    <!-- craft panel now rendered on canvas -->
+  </div>
+
+  <div id="startOverlay" class="start-overlay">
+    <div class="start-card">
+      <h2>Choose your device</h2>
+      <p>Pick your control style to start the game.</p>
+      <div class="start-actions">
+        <button id="startPcBtn">PC</button>
+        <button id="startMobileBtn">Mobile</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+
+    const phaseEl = document.getElementById('phase');
+    const woodEl = document.getElementById('wood');
+    const fireEl = document.getElementById('fire');
+    const hpEl = document.getElementById('hp');
+    const stoneEl = document.getElementById('stone');
+    const trapsEl = document.getElementById('traps');
+    const torchEl = document.getElementById('torch');
+    const upgradesEl = document.getElementById('upgrades');
+    const scoreEl = document.getElementById('score');
+    const energyEl = document.getElementById('energy');
+    const restartBtn = document.getElementById('restartBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const startOverlay = document.getElementById('startOverlay');
+    const startPcBtn = document.getElementById('startPcBtn');
+    const startMobileBtn = document.getElementById('startMobileBtn');
+    const joystickEl = document.getElementById('joystick');
+    const joyKnobEl = document.getElementById('joyKnob');
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isTouchDevice = navigator.maxTouchPoints > 0;
+    const isProbablyMobile = /Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || isIOS;
+
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const WORLD_W = 3200;
+    const WORLD_H = 2200;
+    const camp = { x: WORLD_W * 0.5, y: WORLD_H * 0.5, r: 28 };
+    const craftStation = { x: camp.x + 90, y: camp.y + 10, r: 22 };
+    const BASE_FIRE_RADIUS = 120;
+    const FIRE_RADIUS_PER_LEVEL = 30;
+
+    let player, monster, trees, rocks, trapList, wallList, furnitureList, pointsOfInterest, chests, animals, keys;
+    let wood, stones, traps, health, maxHealth, fireBuilt, gameOver, firePower, fireLevel, torchTimerMs, energy;
+    let fiber, ore, cloth, water, meat, herbs, hide, rope;
+    let hasPickaxe, axePower, minePower, torchDurationBonusMs, torchRadiusBonus, trapSlowBonus, upgradesCount;
+    let dayNightTimer, isNight, survivedNights, currentNightMs;
+    let footstepCooldown = 0;
+    let gameStarted = false;
+    let prevNight = false;
+    let jumpscareTimer = 0;
+    let craftOpen = false;
+    let craftIndex = 0;
+    let rulebookOpen = false;
+    let camX = 0;
+    let camY = 0;
+    let joyDx = 0;
+    let joyDy = 0;
+    let joyActive = false;
+
+    const DAY_MS = 22000;
+    const NIGHT_MS = 30000;
+    const NIGHT_BONUS_EVERY_5_DAYS_MS = 5000;
+    const FIRE_LEVEL_ONE_COST = 4;
+    const FIRE_POWER_MAX = 100;
+    const FIRE_POWER_PER_WOOD = 24;
+    const FIRE_DRAIN_DAY_PER_SEC = 3;
+    const FIRE_DRAIN_NIGHT_PER_SEC = 7;
+    const FIRE_MAX_LEVEL = 6;
+    const TRAP_WOOD_COST = 3;
+    const TRAP_STONE_COST = 2;
+    const TORCH_WOOD_COST = 8;
+    const TORCH_DURATION_MS = 15000;
+    const TORCH_SAFE_RADIUS = 95;
+
+    const RECIPES = {
+      pickaxe: { wood: 6, stone: 0 },
+      boots: { wood: 6, stone: 4 },
+      jacket: { wood: 8, stone: 6 },
+      axe: { wood: 7, stone: 3 },
+      lantern: { wood: 6, stone: 5 },
+      trapper: { wood: 8, stone: 8 },
+      wall: { wood: 5, stone: 2 },
+      furniture: { wood: 4, stone: 1 }
+    };
+
+    const CRAFT_OPTIONS = [
+      { slot: '1', key: 'pickaxe', name: 'Pickaxe', desc: 'Unlock rock mining' },
+      { slot: '2', key: 'boots', name: 'Boots', desc: '+Speed' },
+      { slot: '3', key: 'jacket', name: 'Jacket', desc: '+Max HP' },
+      { slot: '4', key: 'axe', name: 'Axe+', desc: '+Tree damage' },
+      { slot: '5', key: 'lantern', name: 'Lantern', desc: '+Torch power' },
+      { slot: '6', key: 'trapper', name: 'Trap+', desc: '+Trap slow time' },
+      { slot: '7', key: 'wall', name: 'Wall Kit', desc: 'Station-only, defensive wall' },
+      { slot: '8', key: 'furniture', name: 'Furniture', desc: 'Station-only comfort furniture' }
+    ];
+
+    // --- audio ---
+    let audioCtx = null;
+    let ambTimer = null;
+    let nightPulseTimer = null;
+    let hitCooldown = 0;
+    let growlCooldown = 0;
+    let monsterAttackCooldownMs = 0;
+    let damageFlashTimer = 0;
+
+    function initAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function tone(freq = 440, dur = 0.1, type = 'sine', vol = 0.07, when = 0) {
+      if (!audioCtx) return;
+      const t = audioCtx.currentTime + when;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      o.start(t);
+      o.stop(t + dur + 0.02);
+    }
+
+    function startAmbient() {}
+    function stopAmbient() {}
+    function startNightPulse() {}
+    function stopNightPulse() {}
+
+    function sfxChop() {
+      tone(520 + Math.random() * 90, 0.04, 'square', 0.05);
+      tone(210 + Math.random() * 30, 0.07, 'triangle', 0.035, 0.02);
+      tone(980, 0.015, 'sine', 0.02, 0.01);
+    }
+    function sfxBuild() {
+      tone(390, 0.06, 'triangle', 0.055);
+      tone(520, 0.08, 'triangle', 0.06, 0.05);
+      tone(690, 0.10, 'triangle', 0.05, 0.12);
+    }
+    function sfxTorchLight() {
+      tone(780, 0.03, 'triangle', 0.05);
+      tone(980, 0.04, 'sine', 0.045, 0.03);
+      tone(640, 0.08, 'triangle', 0.03, 0.06);
+    }
+    function sfxChestOpen() {
+      tone(260, 0.06, 'square', 0.05);
+      tone(390, 0.08, 'triangle', 0.05, 0.05);
+      tone(620, 0.09, 'triangle', 0.04, 0.10);
+    }
+    function sfxTrapSnap() {
+      tone(160, 0.03, 'square', 0.07);
+      tone(90, 0.08, 'sawtooth', 0.05, 0.02);
+    }
+    function sfxFootstep() {
+      tone(130 + Math.random() * 30, 0.02, 'triangle', 0.03);
+      tone(70 + Math.random() * 20, 0.04, 'sine', 0.018, 0.01);
+    }
+    function sfxSwing() {
+      tone(420, 0.03, 'triangle', 0.03);
+      tone(250, 0.04, 'square', 0.02, 0.02);
+    }
+    function sfxDayToNight() {
+      tone(300, 0.12, 'sawtooth', 0.05);
+      tone(210, 0.18, 'sawtooth', 0.05, 0.10);
+    }
+    function sfxNightToDay() {
+      tone(420, 0.06, 'triangle', 0.06);
+      tone(560, 0.07, 'triangle', 0.06, 0.06);
+      tone(720, 0.09, 'triangle', 0.05, 0.13);
+    }
+    function sfxHit() {
+      tone(145, 0.08, 'square', 0.065);
+      tone(95, 0.09, 'sawtooth', 0.04, 0.03);
+    }
+    function sfxGameOver() {
+      tone(340, 0.06, 'square', 0.11);
+      tone(220, 0.08, 'sawtooth', 0.11, 0.05);
+      tone(120, 0.22, 'sawtooth', 0.12, 0.12);
+      tone(70, 0.55, 'sawtooth', 0.08, 0.24);
+    }
+    function sfxGrowl() {}
+    function sfxJumpscare() {}
+
+    function reset() {
+      player = { x: camp.x + 64, y: camp.y + 4, r: 12, baseSpeed: 2.45, speed: 2.45, angle: 0, walkPhase: 0, action: '', actionTimer: 0 };
+      monster = { x: WORLD_W - 120, y: WORLD_H - 120, r: 14, speedDay: 2.0, speedNight: 2.8, slowTimer: 0 };
+      trees = spawnTrees(50);
+      rocks = spawnRocks(36);
+      trapList = [];
+      wallList = [];
+      furnitureList = [];
+      pointsOfInterest = [
+        { x: 140, y: WORLD_H - 150, type: 'pond' },
+        { x: WORLD_W - 180, y: 140, type: 'ruins' },
+        { x: WORLD_W - 140, y: WORLD_H - 140, type: 'grove' },
+        { x: WORLD_W * 0.25, y: WORLD_H * 0.3, type: 'pond' },
+        { x: WORLD_W * 0.72, y: WORLD_H * 0.65, type: 'ruins' }
+      ];
+      chests = spawnChests(5);
+      animals = spawnAnimals(22);
+      keys = {};
+      wood = 0;
+      stones = 0;
+      fiber = 0;
+      ore = 0;
+      cloth = 0;
+      water = 1;
+      meat = 0;
+      herbs = 0;
+      hide = 0;
+      rope = 0;
+      traps = 0;
+      energy = 70;
+      maxHealth = 100;
+      health = maxHealth;
+      hasPickaxe = false;
+      axePower = 1;
+      minePower = 1;
+      torchDurationBonusMs = 0;
+      torchRadiusBonus = 0;
+      trapSlowBonus = 0;
+      upgradesCount = 0;
+      fireBuilt = false;
+      firePower = 0;
+      fireLevel = 0;
+      torchTimerMs = 0;
+      gameOver = false;
+      dayNightTimer = 0;
+      isNight = false;
+      survivedNights = 0;
+      currentNightMs = NIGHT_MS;
+      prevNight = false;
+      hitCooldown = 0;
+      growlCooldown = 0;
+      monsterAttackCooldownMs = 0;
+      damageFlashTimer = 0;
+      jumpscareTimer = 0;
+      craftOpen = false;
+      craftIndex = 0;
+      rulebookOpen = false;
+      if (typeof resetJoystick === 'function') resetJoystick();
+      renderCraftPanel();
+      updateHud();
+      startAmbient();
+      stopNightPulse();
+    }
+
+    function spawnTrees(n) {
+      const arr = [];
+      for (let i = 0; i < n; i++) {
+        let tx, ty, ok = false;
+        while (!ok) {
+          tx = 56 + Math.random() * (WORLD_W - 112);
+          ty = 56 + Math.random() * (WORLD_H - 112);
+          const dCamp = dist(tx, ty, camp.x, camp.y);
+          if (dCamp > 110) ok = true;
+        }
+        arr.push({ x: tx, y: ty, r: 18, hp: 3 + Math.floor(Math.random() * 3) });
+      }
+      return arr;
+    }
+
+    function spawnRocks(n) {
+      const arr = [];
+      for (let i = 0; i < n; i++) {
+        let rx, ry, ok = false;
+        while (!ok) {
+          rx = 56 + Math.random() * (WORLD_W - 112);
+          ry = 56 + Math.random() * (WORLD_H - 112);
+          const dCamp = dist(rx, ry, camp.x, camp.y);
+          if (dCamp > 120) ok = true;
+        }
+        arr.push({ x: rx, y: ry, r: 15, hp: 3 });
+      }
+      return arr;
+    }
+
+    function spawnChests(n) {
+      const arr = [];
+      for (let i = 0; i < n; i++) {
+        let cx, cy, ok = false;
+        while (!ok) {
+          cx = 80 + Math.random() * (WORLD_W - 160);
+          cy = 80 + Math.random() * (WORLD_H - 160);
+          const dCamp = dist(cx, cy, camp.x, camp.y);
+          if (dCamp > 220) ok = true;
+        }
+        arr.push({ x: cx, y: cy, r: 16, opened: false });
+      }
+      return arr;
+    }
+
+    function spawnAnimals(n) {
+      const arr = [];
+      for (let i = 0; i < n; i++) {
+        arr.push({
+          x: 80 + Math.random() * (WORLD_W - 160),
+          y: 80 + Math.random() * (WORLD_H - 160),
+          r: 11,
+          dir: Math.random() * Math.PI * 2,
+          stepTimer: 30 + Math.random() * 80
+        });
+      }
+      return arr;
+    }
+
+    function dist(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    function currentFireRadius() {
+      if (fireLevel <= 0) return BASE_FIRE_RADIUS;
+      return BASE_FIRE_RADIUS + (fireLevel - 1) * FIRE_RADIUS_PER_LEVEL;
+    }
+
+    function updateHud() {
+      phaseEl.textContent = isNight ? 'Night' : 'Day';
+      woodEl.textContent = wood;
+      if (!fireBuilt) {
+        fireEl.textContent = fireLevel > 0 ? `Out (L${fireLevel})` : 'Not built';
+      } else {
+        fireEl.textContent = `L${fireLevel}/${FIRE_MAX_LEVEL} ${Math.round((firePower / FIRE_POWER_MAX) * 100)}%`;
+      }
+      hpEl.textContent = `${Math.max(0, Math.round(health))}/${maxHealth}`;
+      stoneEl.textContent = stones;
+      trapsEl.textContent = traps;
+      torchEl.textContent = torchTimerMs > 0 ? `${(torchTimerMs / 1000).toFixed(1)}s` : 'Off';
+      upgradesEl.textContent = upgradesCount;
+      scoreEl.textContent = survivedNights;
+      energyEl.textContent = `${Math.round(energy)}%`;
+      renderCraftPanel();
+    }
+
+    function renderCraftPanel() {}
+
+    function nearestTreeInRange() {
+      let best = null, bestD = Infinity;
+      for (const t of trees) {
+        const d = dist(player.x, player.y, t.x, t.y);
+        if (d < 46 && d < bestD) { best = t; bestD = d; }
+      }
+      return best;
+    }
+
+    function chopTree() {
+      if (gameOver) return;
+      initAudio();
+      const t = nearestTreeInRange();
+      if (!t) return;
+      sfxChop();
+      sfxSwing();
+      player.action = 'chop';
+      player.actionTimer = 12;
+      t.hp -= axePower;
+      if (t.hp <= 0) {
+        wood += 2;
+        fiber += 1 + (Math.random() < 0.45 ? 1 : 0);
+        if (Math.random() < 0.2) herbs += 1;
+        trees = trees.filter(x => x !== t);
+        trees.push(...spawnTrees(1));
+      }
+      updateHud();
+    }
+
+    function nearestRockInRange() {
+      let best = null, bestD = Infinity;
+      for (const r of rocks) {
+        const d = dist(player.x, player.y, r.x, r.y);
+        if (d < 42 && d < bestD) { best = r; bestD = d; }
+      }
+      return best;
+    }
+
+    function nearestChestInRange() {
+      let best = null, bestD = Infinity;
+      for (const c of chests) {
+        const d = dist(player.x, player.y, c.x, c.y);
+        if (d < 46 && d < bestD) { best = c; bestD = d; }
+      }
+      return best;
+    }
+
+    function nearestAnimalInRange() {
+      let best = null, bestD = Infinity;
+      for (const a of animals) {
+        const d = dist(player.x, player.y, a.x, a.y);
+        if (d < 50 && d < bestD) { best = a; bestD = d; }
+      }
+      return best;
+    }
+
+    function huntAnimal() {
+      const a = nearestAnimalInRange();
+      if (!a) return false;
+      meat += 2;
+      hide += Math.random() < 0.55 ? 1 : 0;
+      animals = animals.filter(x => x !== a);
+      animals.push(...spawnAnimals(1));
+      sfxChop();
+      updateHud();
+      return true;
+    }
+
+    function consumeFood() {
+      if (meat <= 0) return;
+      meat -= 1;
+      energy = Math.min(100, energy + 30);
+      health = Math.min(maxHealth, health + 8);
+      updateHud();
+    }
+
+    function mineRock() {
+      if (gameOver || !hasPickaxe) return;
+      initAudio();
+      const r = nearestRockInRange();
+      if (!r) return;
+      sfxChop();
+      sfxSwing();
+      player.action = 'mine';
+      player.actionTimer = 12;
+      r.hp -= minePower;
+      if (r.hp <= 0) {
+        stones += 2;
+        ore += 1 + (Math.random() < 0.35 ? 1 : 0);
+        rocks = rocks.filter(x => x !== r);
+        rocks.push(...spawnRocks(1));
+      }
+      updateHud();
+    }
+
+    function craftTrap() {
+      if (gameOver) return;
+      if (wood < TRAP_WOOD_COST || stones < TRAP_STONE_COST) return;
+      wood -= TRAP_WOOD_COST;
+      stones -= TRAP_STONE_COST;
+      traps += 1;
+      trapList.push({ x: player.x, y: player.y, r: 18, ttl: 22000 });
+      sfxBuild();
+      updateHud();
+    }
+
+    function igniteTorch() {
+      if (gameOver) return;
+      if (wood < TORCH_WOOD_COST) return;
+      wood -= TORCH_WOOD_COST;
+      torchTimerMs = TORCH_DURATION_MS + torchDurationBonusMs;
+      sfxTorchLight();
+      updateHud();
+    }
+
+    function spend(cost) {
+      if (wood < cost.wood || stones < cost.stone) return false;
+      wood -= cost.wood;
+      stones -= cost.stone;
+      return true;
+    }
+
+    function openChest() {
+      const c = nearestChestInRange();
+      if (!c) return false;
+      wood += 2 + Math.floor(Math.random() * 5);
+      stones += Math.floor(Math.random() * 4);
+      cloth += Math.floor(Math.random() * 3);
+      rope += Math.random() < 0.5 ? 1 : 0;
+      if (Math.random() < 0.35) torchTimerMs = Math.max(torchTimerMs, 2500);
+      chests = chests.filter(x => x !== c);
+      sfxChestOpen();
+      updateHud();
+      return true;
+    }
+
+    function craftUpgrade(slot) {
+      if (gameOver) return;
+      let crafted = false;
+      const nearStation = dist(player.x, player.y, craftStation.x, craftStation.y) <= craftStation.r + 28;
+
+      if (slot === '1' && !hasPickaxe && spend(RECIPES.pickaxe)) {
+        hasPickaxe = true;
+        crafted = true;
+      } else if (slot === '2' && spend(RECIPES.boots)) {
+        player.baseSpeed += 0.45;
+        crafted = true;
+      } else if (slot === '3' && spend(RECIPES.jacket)) {
+        maxHealth += 25;
+        health = Math.min(maxHealth, health + 25);
+        crafted = true;
+      } else if (slot === '4' && spend(RECIPES.axe)) {
+        axePower += 1;
+        crafted = true;
+      } else if (slot === '5' && spend(RECIPES.lantern)) {
+        torchDurationBonusMs += 6000;
+        torchRadiusBonus += 20;
+        crafted = true;
+      } else if (slot === '6' && spend(RECIPES.trapper)) {
+        trapSlowBonus += 60;
+        crafted = true;
+      } else if (slot === '7' && nearStation && spend(RECIPES.wall)) {
+        wallList.push({ x: player.x, y: player.y, r: 18, hp: 70, maxHp: 70 });
+        crafted = true;
+      } else if (slot === '8' && nearStation && spend(RECIPES.furniture)) {
+        furnitureList.push({ x: player.x, y: player.y, r: 15, type: Math.random() > 0.5 ? 'chair' : 'table' });
+        crafted = true;
+      }
+
+      if (crafted) {
+        upgradesCount += 1;
+        sfxBuild();
+        updateHud();
+      }
+    }
+
+    function nearestPoiInRange() {
+      let best = null, bestD = Infinity;
+      for (const p of pointsOfInterest) {
+        const d = dist(player.x, player.y, p.x, p.y);
+        if (d < 58 && d < bestD) { best = p; bestD = d; }
+      }
+      return best;
+    }
+
+    function interact() {
+      const dCamp = dist(player.x, player.y, camp.x, camp.y);
+      const dStation = dist(player.x, player.y, craftStation.x, craftStation.y);
+      if (dCamp <= camp.r + 22) {
+        tryBuildFire();
+        return;
+      }
+      if (dStation <= craftStation.r + 28) {
+        craftOpen = true;
+        renderCraftPanel();
+        return;
+      }
+      const poi = nearestPoiInRange();
+      if (poi) {
+        if (poi.type === 'pond') {
+          water = Math.min(12, water + 2);
+        } else if (poi.type === 'grove') {
+          herbs += 1 + (Math.random() < 0.3 ? 1 : 0);
+          fiber += 1;
+        } else if (poi.type === 'ruins') {
+          cloth += 1;
+          rope += Math.random() < 0.4 ? 1 : 0;
+          if (Math.random() < 0.25) hide += 1;
+        }
+        updateHud();
+        return;
+      }
+      if (openChest()) return;
+      if (huntAnimal()) return;
+      if (nearestTreeInRange()) {
+        chopTree();
+        return;
+      }
+      if (nearestRockInRange()) {
+        mineRock();
+        return;
+      }
+    }
+
+    function tryBuildFire() {
+      if (gameOver) return;
+      initAudio();
+      const dCamp = dist(player.x, player.y, camp.x, camp.y);
+      if (dCamp > camp.r + 22) return;
+
+      let changed = false;
+
+      if (fireLevel === 0) {
+        if (wood < FIRE_LEVEL_ONE_COST) return;
+        wood -= FIRE_LEVEL_ONE_COST;
+        fireLevel = 1;
+        fireBuilt = true;
+        firePower = 45;
+        changed = true;
+      } else {
+        if (wood < 1) return;
+        wood -= 1;
+        if (!fireBuilt) fireBuilt = true;
+        firePower = Math.min(FIRE_POWER_MAX, firePower + FIRE_POWER_PER_WOOD);
+        if (firePower >= FIRE_POWER_MAX && fireLevel < FIRE_MAX_LEVEL) {
+          fireLevel += 1;
+          firePower = FIRE_POWER_MAX * 0.2;
+        }
+        changed = true;
+      }
+
+      if (changed) {
+        sfxBuild();
+        updateHud();
+      }
+    }
+
+    function playerSafeAtNight() {
+      const campSafe = fireBuilt && dist(player.x, player.y, camp.x, camp.y) <= currentFireRadius();
+      const torchSafe = torchTimerMs > 0;
+      return campSafe || torchSafe;
+    }
+
+    function updatePlayer() {
+      const carryWeight = wood + stones + (ore * 2) + (hide * 2) + rope + cloth + meat;
+      const weightPenalty = Math.min(0.95, carryWeight * 0.0085);
+      const energyBonus = (energy / 100) * 0.75;
+      player.speed = Math.max(1.25, player.baseSpeed + energyBonus - weightPenalty);
+
+      let dx = 0, dy = 0;
+      if (keys['w'] || keys['arrowup']) dy -= 1;
+      if (keys['s'] || keys['arrowdown']) dy += 1;
+      if (keys['a'] || keys['arrowleft']) dx -= 1;
+      if (keys['d'] || keys['arrowright']) dx += 1;
+      dx += joyDx;
+      dy += joyDy;
+      if (dx || dy) {
+        const len = Math.hypot(dx, dy);
+        dx /= len; dy /= len;
+        player.x += dx * player.speed;
+        player.y += dy * player.speed;
+        player.angle = Math.atan2(dy, dx);
+        player.walkPhase += 0.35;
+        if (footstepCooldown <= 0) {
+          sfxFootstep();
+          footstepCooldown = 10;
+        }
+      }
+      if (footstepCooldown > 0) footstepCooldown -= 1;
+      player.x = clamp(player.x, player.r, WORLD_W - player.r);
+      player.y = clamp(player.y, player.r, WORLD_H - player.r);
+    }
+
+    function updateMonster() {
+      const safeByCamp = fireBuilt && dist(player.x, player.y, camp.x, camp.y) <= currentFireRadius();
+      const safeByTorch = torchTimerMs > 0;
+      const unsafe = isNight && !(safeByCamp || safeByTorch);
+
+      if (!isNight) {
+        // hide far away during daytime
+        monster.x = WORLD_W + 120;
+        monster.y = WORLD_H + 120;
+        return;
+      }
+
+      const tx = player.x;
+      const ty = player.y;
+      monster.speedNight = player.speed + 0.55;
+      monster.speedDay = Math.max(1.8, player.speed - 0.15);
+      let speed = unsafe ? monster.speedNight : monster.speedDay;
+      if (monster.slowTimer > 0) {
+        speed *= 0.45;
+        monster.slowTimer -= 1;
+      }
+
+      const dx = tx - monster.x;
+      const dy = ty - monster.y;
+      const len = Math.hypot(dx, dy) || 1;
+      monster.x += (dx / len) * speed;
+      monster.y += (dy / len) * speed;
+
+      if (fireBuilt) {
+        const dToCampRaw = dist(monster.x, monster.y, camp.x, camp.y);
+        const minDist = currentFireRadius() + monster.r + 2;
+        if (dToCampRaw < minDist) {
+          const dToCamp = dToCampRaw || 1;
+          let awayX = (monster.x - camp.x) / dToCamp;
+          let awayY = (monster.y - camp.y) / dToCamp;
+          if (dToCampRaw === 0) {
+            awayX = 1;
+            awayY = 0;
+          }
+          monster.x = camp.x + awayX * minDist;
+          monster.y = camp.y + awayY * minDist;
+        }
+      }
+
+      if (safeByTorch) {
+        const torchRadius = TORCH_SAFE_RADIUS + torchRadiusBonus;
+        const dToPlayerRaw = dist(monster.x, monster.y, player.x, player.y);
+        const minDist = torchRadius + monster.r;
+        if (dToPlayerRaw < minDist) {
+          const dToPlayer = dToPlayerRaw || 1;
+          monster.x = player.x + ((monster.x - player.x) / dToPlayer) * minDist;
+          monster.y = player.y + ((monster.y - player.y) / dToPlayer) * minDist;
+        }
+      }
+
+      for (const tr of trapList) {
+        if (dist(monster.x, monster.y, tr.x, tr.y) < monster.r + tr.r) {
+          monster.slowTimer = 120 + trapSlowBonus;
+          sfxTrapSnap();
+          const dxPush = monster.x - tr.x;
+          const dyPush = monster.y - tr.y;
+          const lenPush = Math.hypot(dxPush, dyPush) || 1;
+          monster.x += (dxPush / lenPush) * 18;
+          monster.y += (dyPush / lenPush) * 18;
+          tr.ttl = 0;
+        }
+      }
+
+      for (const w of wallList) {
+        const dWall = dist(monster.x, monster.y, w.x, w.y);
+        if (dWall < monster.r + w.r) {
+          const nx = (monster.x - w.x) / (dWall || 1);
+          const ny = (monster.y - w.y) / (dWall || 1);
+          monster.x = w.x + nx * (monster.r + w.r + 1);
+          monster.y = w.y + ny * (monster.r + w.r + 1);
+          w.hp -= 0.28;
+        }
+      }
+      wallList = wallList.filter(w => w.hp > 0);
+
+      if (hitCooldown > 0) hitCooldown -= 1;
+      if (growlCooldown > 0) growlCooldown -= 1;
+
+      if (unsafe && growlCooldown <= 0) {
+        sfxGrowl();
+        growlCooldown = 70;
+      }
+
+      if (unsafe && dist(monster.x, monster.y, player.x, player.y) < monster.r + player.r + 2) {
+        if (monsterAttackCooldownMs <= 0) {
+          const hitDamage = 15 + Math.floor(Math.random() * 11);
+          health -= hitDamage;
+          damageFlashTimer = 16;
+          monsterAttackCooldownMs = 1000;
+          if (hitCooldown <= 0) {
+            sfxHit();
+            hitCooldown = 12;
+          }
+          if (health <= 0) {
+            health = 0;
+            gameOver = true;
+            jumpscareTimer = 90;
+            sfxJumpscare();
+            sfxGameOver();
+            stopNightPulse();
+          }
+          updateHud();
+        }
+      }
+    }
+
+    function updateCycle() {
+      const dt = 16.67;
+      dayNightTimer += dt;
+
+      const prevFireBuilt = fireBuilt;
+      const prevFirePower = firePower;
+      const prevTorchTimer = torchTimerMs;
+      if (fireBuilt) {
+        const drainPerSec = isNight ? FIRE_DRAIN_NIGHT_PER_SEC : FIRE_DRAIN_DAY_PER_SEC;
+        firePower = Math.max(0, firePower - drainPerSec * (dt / 1000));
+        if (firePower <= 0) {
+          fireBuilt = false;
+          firePower = 0;
+        }
+      }
+
+      if (torchTimerMs > 0) torchTimerMs = Math.max(0, torchTimerMs - dt);
+      if (player.actionTimer > 0) {
+        player.actionTimer -= 1;
+      } else {
+        player.action = '';
+      }
+
+      for (const tr of trapList) tr.ttl -= dt;
+      trapList = trapList.filter(tr => tr.ttl > 0);
+      traps = trapList.length;
+
+      monsterAttackCooldownMs = Math.max(0, monsterAttackCooldownMs - dt);
+      if (damageFlashTimer > 0) damageFlashTimer -= 1;
+      energy = Math.max(0, energy - (isNight ? 0.028 : 0.018) * (dt / 16.67));
+
+      for (const a of animals) {
+        a.stepTimer -= 1;
+        if (a.stepTimer <= 0) {
+          a.dir += (Math.random() - 0.5) * 1.6;
+          a.stepTimer = 30 + Math.random() * 80;
+        }
+        a.x += Math.cos(a.dir) * 0.45;
+        a.y += Math.sin(a.dir) * 0.45;
+        a.x = clamp(a.x, 30, WORLD_W - 30);
+        a.y = clamp(a.y, 30, WORLD_H - 30);
+      }
+
+      const comfort = furnitureList.some(f => dist(player.x, player.y, f.x, f.y) < 80);
+      if (comfort && health < maxHealth) health = Math.min(maxHealth, health + 0.015 * (dt / 16.67));
+
+      if (
+        prevFireBuilt !== fireBuilt ||
+        Math.floor(prevFirePower) !== Math.floor(firePower) ||
+        Math.floor(prevTorchTimer / 100) !== Math.floor(torchTimerMs / 100)
+      ) updateHud();
+
+      if (!isNight && dayNightTimer >= DAY_MS) {
+        isNight = true;
+        dayNightTimer = 0;
+        sfxDayToNight();
+        startNightPulse();
+        updateHud();
+      } else if (isNight && dayNightTimer >= currentNightMs) {
+        isNight = false;
+        dayNightTimer = 0;
+        survivedNights += 1;
+        currentNightMs = NIGHT_MS + Math.floor(survivedNights / 5) * NIGHT_BONUS_EVERY_5_DAYS_MS;
+        sfxNightToDay();
+        stopNightPulse();
+        updateHud();
+      }
+
+      if (prevNight !== isNight) prevNight = isNight;
+    }
+
+    function drawBackground() {
+      if (isNight) {
+        const g = ctx.createLinearGradient(0, 0, 0, WORLD_H);
+        g.addColorStop(0, '#060b17');
+        g.addColorStop(1, '#101827');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+      } else {
+        const ground = ctx.createLinearGradient(0, 0, 0, WORLD_H);
+        ground.addColorStop(0, '#84d96f');
+        ground.addColorStop(0.45, '#63be59');
+        ground.addColorStop(1, '#418f49');
+        ctx.fillStyle = ground;
+        ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+        // biome tints for exploration feel
+        const biomes = [
+          { x: WORLD_W * 0.18, y: WORLD_H * 0.22, r: 280, c: 'rgba(130,200,255,0.16)' },
+          { x: WORLD_W * 0.74, y: WORLD_H * 0.28, r: 320, c: 'rgba(210,180,120,0.14)' },
+          { x: WORLD_W * 0.62, y: WORLD_H * 0.74, r: 360, c: 'rgba(120,230,170,0.12)' }
+        ];
+        for (const b of biomes) {
+          const g = ctx.createRadialGradient(b.x, b.y, 40, b.x, b.y, b.r);
+          g.addColorStop(0, b.c);
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      const edgeFog = ctx.createRadialGradient(WORLD_W/2, WORLD_H/2, Math.min(WORLD_W, WORLD_H)*0.22, WORLD_W/2, WORLD_H/2, Math.max(WORLD_W, WORLD_H)*0.72);
+      edgeFog.addColorStop(0, 'rgba(0,0,0,0)');
+      edgeFog.addColorStop(1, 'rgba(0,0,0,0.20)');
+      ctx.fillStyle = edgeFog;
+      ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+      ctx.globalAlpha = 0.04;
+      ctx.strokeStyle = '#fff';
+      for (let x = 0; x < WORLD_W; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_H); ctx.stroke();
+      }
+      for (let y = 0; y < WORLD_H; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_W, y); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawCampfire() {
+      // camp platform
+      ctx.beginPath();
+      ctx.fillStyle = '#7d6342';
+      ctx.arc(camp.x, camp.y, camp.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (fireBuilt) {
+        const fireRadius = currentFireRadius();
+        if (isNight) {
+          const g = ctx.createRadialGradient(camp.x, camp.y, 8, camp.x, camp.y, fireRadius);
+          g.addColorStop(0, 'rgba(255,190,100,.48)');
+          g.addColorStop(1, 'rgba(255,170,70,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(camp.x, camp.y, fireRadius, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = 'rgba(255,208,140,.35)';
+          ctx.setLineDash([8, 6]);
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(camp.x, camp.y, fireRadius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        ctx.strokeStyle = '#5f3a24';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(camp.x - 12, camp.y + 8);
+        ctx.lineTo(camp.x + 12, camp.y - 8);
+        ctx.moveTo(camp.x - 12, camp.y - 8);
+        ctx.lineTo(camp.x + 12, camp.y + 8);
+        ctx.stroke();
+
+        const flick = 4 + Math.sin(Date.now() * 0.02) * 1.8;
+        ctx.fillStyle = '#ff8a3c';
+        ctx.beginPath();
+        ctx.moveTo(camp.x, camp.y - 18 - flick);
+        ctx.lineTo(camp.x - 9, camp.y + 6);
+        ctx.lineTo(camp.x + 9, camp.y + 6);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#ffd56a';
+        ctx.beginPath();
+        ctx.moveTo(camp.x, camp.y - 11 - flick * 0.5);
+        ctx.lineTo(camp.x - 5, camp.y + 4);
+        ctx.lineTo(camp.x + 5, camp.y + 4);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,.92)';
+        ctx.font = '12px sans-serif';
+        ctx.fillText('Camp (E to build/relight fire)', camp.x - 70, camp.y - 34);
+      }
+    }
+
+    function drawTrees() {
+      const tnow = Date.now() * 0.002;
+      for (const t of trees) {
+        const sway = Math.sin(tnow + t.x * 0.02 + t.y * 0.015) * 1.5;
+        ctx.fillStyle = '#6f4426';
+        ctx.fillRect(t.x - 5 + sway * 0.2, t.y + 7, 10, 14);
+
+        const grad = ctx.createRadialGradient(t.x + sway, t.y - 4, 3, t.x + sway, t.y, t.r + 1);
+        grad.addColorStop(0, '#4db765');
+        grad.addColorStop(1, '#2e7e3f');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(t.x + sway, t.y, t.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fff';
+        for (let i = 0; i < t.hp; i++) ctx.fillRect(t.x - 9 + i * 6, t.y - t.r - 10, 4, 4);
+      }
+    }
+
+    function drawRocks() {
+      for (const r of rocks) {
+        ctx.fillStyle = '#8f99ad';
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#d5dbe6';
+        for (let i = 0; i < r.hp; i++) ctx.fillRect(r.x - 8 + i * 6, r.y - r.r - 8, 4, 4);
+      }
+    }
+
+    function drawChests() {
+      for (const c of chests) {
+        ctx.fillStyle = '#9a6232';
+        ctx.fillRect(c.x - 12, c.y - 8, 24, 16);
+        ctx.fillStyle = '#d9b36f';
+        ctx.fillRect(c.x - 12, c.y - 10, 24, 4);
+        ctx.fillStyle = '#2f2f2f';
+        ctx.fillRect(c.x - 2, c.y - 2, 4, 6);
+      }
+    }
+
+    function drawAnimals() {
+      const t = Date.now() * 0.01;
+      for (const a of animals) {
+        const bob = Math.sin((a.stepTimer || 0) * 0.15) * 1.5;
+        const breath = 1 + Math.sin(t + a.x * 0.03) * 0.04;
+
+        ctx.fillStyle = 'rgba(0,0,0,.22)';
+        ctx.beginPath();
+        ctx.ellipse(a.x, a.y + 9, 11, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.save();
+        ctx.translate(a.x, a.y + bob);
+        ctx.scale(breath, breath);
+
+        const body = ctx.createLinearGradient(-12, -6, 12, 6);
+        body.addColorStop(0, '#c89b71');
+        body.addColorStop(1, '#9a6e49');
+        ctx.fillStyle = body;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 12, 9, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#7b5237';
+        ctx.beginPath(); ctx.arc(8, -1, 5.4, 0, Math.PI * 2); ctx.fill();
+
+        ctx.fillStyle = '#5f3d2a';
+        ctx.fillRect(-6, 6, 2.8, 5);
+        ctx.fillRect(-1.5, 6, 2.8, 5);
+        ctx.fillRect(3, 6, 2.8, 5);
+
+        ctx.fillStyle = '#111';
+        ctx.beginPath(); ctx.arc(9.6, -2.2, 1.1, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#f7d3bb';
+        ctx.beginPath(); ctx.arc(12, 0.8, 1.5, 0, Math.PI * 2); ctx.fill();
+
+        ctx.restore();
+      }
+    }
+
+    function drawPointsOfInterest() {
+      const t = Date.now() * 0.002;
+      for (const p of pointsOfInterest) {
+        if (p.type === 'pond') {
+          const ripple = Math.sin(t + p.x * 0.01) * 2.2;
+          const g = ctx.createRadialGradient(p.x, p.y, 8, p.x, p.y, 44 + ripple);
+          g.addColorStop(0, '#9ee6ff');
+          g.addColorStop(1, '#2f89c8');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.ellipse(p.x, p.y, 52 + ripple, 34 + ripple * 0.6, 0.2, 0, Math.PI * 2); ctx.fill();
+
+          ctx.strokeStyle = 'rgba(170,230,255,.55)';
+          ctx.lineWidth = 1.4;
+          for (let i = 0; i < 3; i++) {
+            const rr = 10 + i * 10 + ((t * 16 + i * 9) % 10);
+            ctx.beginPath();
+            ctx.ellipse(p.x + Math.sin(t + i) * 2, p.y + Math.cos(t + i) * 1.5, rr, rr * 0.58, 0.2, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        } else if (p.type === 'ruins') {
+          const wob = Math.sin(t * 0.8 + p.y * 0.02) * 0.9;
+          ctx.fillStyle = '#8f8477';
+          ctx.fillRect(p.x - 30 + wob, p.y - 18, 18, 36);
+          ctx.fillRect(p.x - 4 - wob * 0.6, p.y - 28, 16, 46);
+          ctx.fillRect(p.x + 18 + wob * 0.5, p.y - 12, 14, 30);
+        } else {
+          const sway = Math.sin(t + p.x * 0.015) * 2.2;
+          ctx.fillStyle = '#2f8746';
+          ctx.beginPath(); ctx.arc(p.x + sway * 0.4, p.y, 34, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#4db765';
+          ctx.beginPath(); ctx.arc(p.x + 14 + sway, p.y - 8, 20, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+
+    function drawCraftStation() {
+      ctx.fillStyle = '#6b6f83';
+      ctx.beginPath();
+      ctx.arc(craftStation.x, craftStation.y, craftStation.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#b8c4e8';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#e8efff';
+      ctx.font = '12px sans-serif';
+      ctx.fillText('Craft Station', craftStation.x - 36, craftStation.y - 30);
+    }
+
+    function drawWallsAndFurniture() {
+      for (const w of wallList) {
+        const hpRatio = w.hp / w.maxHp;
+        ctx.fillStyle = hpRatio > 0.5 ? '#a1815a' : '#7a5d3d';
+        ctx.fillRect(w.x - 14, w.y - 10, 28, 20);
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(w.x - 14, w.y - 16, 28, 4);
+        ctx.fillStyle = '#78e08f';
+        ctx.fillRect(w.x - 14, w.y - 16, 28 * hpRatio, 4);
+      }
+
+      for (const f of furnitureList) {
+        if (f.type === 'chair') {
+          ctx.fillStyle = '#b98756';
+          ctx.fillRect(f.x - 8, f.y - 8, 16, 16);
+          ctx.fillRect(f.x - 8, f.y - 16, 16, 6);
+        } else {
+          ctx.fillStyle = '#8b5a30';
+          ctx.fillRect(f.x - 12, f.y - 7, 24, 14);
+        }
+      }
+    }
+
+    function drawTraps() {
+      for (const tr of trapList) {
+        ctx.strokeStyle = 'rgba(255,210,90,.9)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(tr.x, tr.y, tr.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,120,70,.9)';
+        ctx.beginPath();
+        ctx.moveTo(tr.x - 10, tr.y);
+        ctx.lineTo(tr.x + 10, tr.y);
+        ctx.moveTo(tr.x, tr.y - 10);
+        ctx.lineTo(tr.x, tr.y + 10);
+        ctx.stroke();
+      }
+    }
+
+    function drawPlayer() {
+      if (isNight && torchTimerMs > 0) {
+        const torchRadius = TORCH_SAFE_RADIUS + torchRadiusBonus;
+        const tg = ctx.createRadialGradient(player.x, player.y, 8, player.x, player.y, torchRadius);
+        tg.addColorStop(0, 'rgba(255,200,120,.30)');
+        tg.addColorStop(1, 'rgba(255,170,70,0)');
+        ctx.fillStyle = tg;
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, torchRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const bob = Math.sin(player.walkPhase || 0) * 1.2;
+      const squish = player.actionTimer > 0 ? 0.88 : 1;
+      const px = player.x;
+      const py = player.y + bob;
+
+      ctx.fillStyle = 'rgba(0,0,0,.22)';
+      ctx.beginPath();
+      ctx.ellipse(px, py + 12, 10, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(player.action === 'chop' || player.action === 'mine' ? Math.sin((12 - player.actionTimer) * 0.7) * 0.22 : 0);
+      ctx.scale(1, squish);
+
+      // torso
+      const body = ctx.createLinearGradient(-10, -8, 10, 10);
+      body.addColorStop(0, '#7ca8ff');
+      body.addColorStop(1, '#3f66c7');
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.roundRect(-9, -1, 18, 16, 5);
+      ctx.fill();
+
+      // arms
+      const armSwing = Math.sin(player.walkPhase || 0) * 2.2;
+      ctx.fillStyle = '#efb184';
+      ctx.fillRect(-12, 1 + armSwing * 0.25, 3.4, 8);
+      ctx.fillRect(8.6, 1 - armSwing * 0.25, 3.4, 8);
+
+      // head
+      const g = ctx.createRadialGradient(-4, -8, 2, 0, -8, player.r * 0.82);
+      g.addColorStop(0, '#ffe2c7');
+      g.addColorStop(1, '#efb184');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(0, -8, player.r * 0.72, 0, Math.PI * 2);
+      ctx.fill();
+
+      // hair (top spiky style)
+      const hairFlow = Math.sin((player.walkPhase || 0) * 0.35) * 0.5;
+      ctx.fillStyle = '#322014';
+      ctx.beginPath();
+      ctx.moveTo(-9, -18);
+      ctx.lineTo(-6, -23 - hairFlow);
+      ctx.lineTo(-2, -19);
+      ctx.lineTo(1, -26 - hairFlow);
+      ctx.lineTo(4, -19);
+      ctx.lineTo(8, -23 - hairFlow * 0.8);
+      ctx.lineTo(10, -15);
+      ctx.lineTo(7, -12);
+      ctx.lineTo(1, -13);
+      ctx.lineTo(-5, -12);
+      ctx.lineTo(-10, -15);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#5a3b26';
+      ctx.beginPath();
+      ctx.moveTo(-4, -18);
+      ctx.lineTo(-1, -21.5);
+      ctx.lineTo(1.5, -18.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // face
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.arc(-3.6, -8.8, 1.35, 0, Math.PI * 2);
+      ctx.arc(3.6, -8.8, 1.35, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#8a3e23';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(0, -5.5, 2.8, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+
+      // legs walk
+      const legSwing = Math.sin(player.walkPhase || 0) * 1.8;
+      ctx.fillStyle = '#2d4485';
+      ctx.fillRect(-6 + legSwing * 0.25, 14, 4.2, 7);
+      ctx.fillRect(1.8 - legSwing * 0.25, 14, 4.2, 7);
+
+      if (player.action === 'chop' || player.action === 'mine') {
+        ctx.strokeStyle = '#d9ecff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(7, -2);
+        ctx.lineTo(15, -12);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      if (isNight && playerSafeAtNight()) {
+        ctx.strokeStyle = 'rgba(255,235,164,.85)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px, py, player.r + 10, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    function drawMonster() {
+      if (!isNight) return; // hidden in daytime
+
+      const pulse = Math.sin(Date.now() * 0.017) * 3;
+      const rr = monster.r + pulse;
+
+      // shadow aura
+      const aura = ctx.createRadialGradient(monster.x, monster.y, 8, monster.x, monster.y, rr + 26);
+      aura.addColorStop(0, 'rgba(180,0,0,.28)');
+      aura.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(monster.x, monster.y, rr + 26, 0, Math.PI * 2);
+      ctx.fill();
+
+      // body blob
+      const g = ctx.createRadialGradient(monster.x - 5, monster.y - 7, 2, monster.x, monster.y, rr + 6);
+      g.addColorStop(0, '#ff5757');
+      g.addColorStop(0.55, '#8d0f0f');
+      g.addColorStop(1, '#180000');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(monster.x, monster.y, rr + 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // spikes/horns
+      ctx.fillStyle = '#130000';
+      for (let i = -2; i <= 2; i++) {
+        const hx = monster.x + i * 6;
+        ctx.beginPath();
+        ctx.moveTo(hx - 4, monster.y - rr + 2);
+        ctx.lineTo(hx, monster.y - rr - 16 - Math.abs(i) * 2);
+        ctx.lineTo(hx + 4, monster.y - rr + 2);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // glowing eyes + tears
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(monster.x - 7, monster.y - 4, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(monster.x + 7, monster.y - 4, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff0000';
+      ctx.beginPath(); ctx.arc(monster.x - 7, monster.y - 4, 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(monster.x + 7, monster.y - 4, 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,0,0,.55)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(monster.x - 7, monster.y - 1); ctx.lineTo(monster.x - 9, monster.y + 8); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(monster.x + 7, monster.y - 1); ctx.lineTo(monster.x + 9, monster.y + 8); ctx.stroke();
+
+      // jagged mouth + teeth
+      ctx.fillStyle = '#2b0000';
+      ctx.beginPath();
+      ctx.moveTo(monster.x - 11, monster.y + 7);
+      ctx.lineTo(monster.x - 6, monster.y + 15);
+      ctx.lineTo(monster.x - 2, monster.y + 9);
+      ctx.lineTo(monster.x + 2, monster.y + 15);
+      ctx.lineTo(monster.x + 6, monster.y + 9);
+      ctx.lineTo(monster.x + 11, monster.y + 15);
+      ctx.lineTo(monster.x + 11, monster.y + 18);
+      ctx.lineTo(monster.x - 11, monster.y + 18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#f8f8f8';
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(monster.x + i * 4, monster.y + 9);
+        ctx.lineTo(monster.x + i * 4 - 2, monster.y + 14);
+        ctx.lineTo(monster.x + i * 4 + 2, monster.y + 14);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = 'rgba(255,20,20,.75)';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(monster.x, monster.y, rr + 10 + Math.sin(Date.now() * 0.03) * 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    function drawOverlay() {
+      if (isNight) {
+        ctx.fillStyle = 'rgba(10, 12, 30, 0.34)';
+        ctx.fillRect(0, 0, W, H);
+        if (!playerSafeAtNight()) {
+          ctx.fillStyle = 'rgba(180, 20, 20, 0.13)';
+          ctx.fillRect(0, 0, W, H);
+        }
+      }
+
+      if (damageFlashTimer > 0) {
+        const a = Math.min(0.55, damageFlashTimer / 22);
+        const edge = 58;
+        const gradTop = ctx.createLinearGradient(0, 0, 0, edge);
+        gradTop.addColorStop(0, `rgba(255,20,20,${a})`);
+        gradTop.addColorStop(1, 'rgba(255,20,20,0)');
+        ctx.fillStyle = gradTop;
+        ctx.fillRect(0, 0, W, edge);
+
+        const gradBottom = ctx.createLinearGradient(0, H, 0, H - edge);
+        gradBottom.addColorStop(0, `rgba(255,20,20,${a})`);
+        gradBottom.addColorStop(1, 'rgba(255,20,20,0)');
+        ctx.fillStyle = gradBottom;
+        ctx.fillRect(0, H - edge, W, edge);
+
+        const gradLeft = ctx.createLinearGradient(0, 0, edge, 0);
+        gradLeft.addColorStop(0, `rgba(255,20,20,${a})`);
+        gradLeft.addColorStop(1, 'rgba(255,20,20,0)');
+        ctx.fillStyle = gradLeft;
+        ctx.fillRect(0, 0, edge, H);
+
+        const gradRight = ctx.createLinearGradient(W, 0, W - edge, 0);
+        gradRight.addColorStop(0, `rgba(255,20,20,${a})`);
+        gradRight.addColorStop(1, 'rgba(255,20,20,0)');
+        ctx.fillStyle = gradRight;
+        ctx.fillRect(W - edge, 0, edge, H);
+      }
+    }
+
+    function drawFirePowerBar() {
+      const x = 20, y = H - 36, w = 300, h = 14;
+      ctx.fillStyle = 'rgba(0,0,0,.45)';
+      ctx.fillRect(x, y, w, h);
+      const pct = fireBuilt ? (firePower / FIRE_POWER_MAX) : 0;
+      ctx.fillStyle = '#ff9b4a';
+      ctx.fillRect(x, y, w * pct, h);
+      ctx.strokeStyle = '#ffd8a8';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, w, h);
+      ctx.fillStyle = '#fff';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(`Campfire Power ${Math.round(pct * 100)}% · Level ${fireLevel}/${FIRE_MAX_LEVEL}`, x, y - 6);
+    }
+
+    function drawEnergyBar() {
+      const x = 340, y = H - 36, w = 230, h = 14;
+      const pct = clamp(energy / 100, 0, 1);
+      ctx.fillStyle = 'rgba(0,0,0,.45)';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = '#7ff0a7';
+      ctx.fillRect(x, y, w * pct, h);
+      ctx.strokeStyle = '#b6ffd0';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, w, h);
+      ctx.fillStyle = '#eafff3';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(`Energy ${Math.round(energy)}% · Eat meat (X/mobile) for speed`, x, y - 6);
+    }
+
+    function drawCraftPanelCanvas() {
+      if (!craftOpen) return;
+      const x = W - 380, y = 20, w = 360, h = 270;
+      ctx.fillStyle = 'rgba(8,14,28,.92)';
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = '#6d92ff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, w, h);
+      ctx.fillStyle = '#d6e5ff';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.fillText('Crafting (C close)', x + 10, y + 22);
+
+      ctx.font = '13px sans-serif';
+      CRAFT_OPTIONS.forEach((opt, idx) => {
+        const c = RECIPES[opt.key];
+        const rowY = y + 48 + idx * 25;
+        const selected = idx === craftIndex;
+        const affordable = wood >= c.wood && stones >= c.stone;
+        const done = opt.key === 'pickaxe' && hasPickaxe;
+
+        if (selected) {
+          ctx.fillStyle = 'rgba(255,229,155,.16)';
+          ctx.fillRect(x + 8, rowY - 15, w - 16, 20);
+        }
+        ctx.fillStyle = selected ? '#ffe59b' : '#ffffff';
+        ctx.fillText(`${selected ? '▶ ' : ''}${opt.name}${done ? ' (DONE)' : ''}`, x + 12, rowY);
+        ctx.fillStyle = affordable ? '#99f3b1' : '#ffb3b3';
+        ctx.fillText(`${c.wood}W/${c.stone}S`, x + 235, rowY);
+      });
+    }
+
+    function drawMiniMap() {
+      const mapX = 20, mapY = 20, mapR = 78;
+      const scale = 0.12;
+      ctx.save();
+      ctx.translate(mapX + mapR, mapY + mapR);
+      ctx.fillStyle = 'rgba(8,14,28,.86)';
+      ctx.beginPath();
+      ctx.arc(0, 0, mapR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#6d92ff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, mapR - 2, 0, Math.PI * 2);
+      ctx.clip();
+
+      // fixed north-up map (no rotation)
+
+      const dot = (x, y, color, r = 3) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc((x - player.x) * scale, (y - player.y) * scale, r, 0, Math.PI * 2);
+        ctx.fill();
+      };
+
+      dot(camp.x, camp.y, '#ffb56e', 4);
+      dot(craftStation.x, craftStation.y, '#c3d4ff', 3.5);
+      chests.forEach(c => dot(c.x, c.y, '#f1c27b', 2.4));
+      trees.forEach(t => dot(t.x, t.y, '#6fe08b', 2.2));
+      rocks.forEach(r => dot(r.x, r.y, '#b9c6da', 2.2));
+      wallList.forEach(w => dot(w.x, w.y, '#b99468', 2));
+      furnitureList.forEach(f => dot(f.x, f.y, '#d9a572', 1.8));
+      pointsOfInterest.forEach(p => dot(p.x, p.y, '#8cc7ff', 2.4));
+      trapList.forEach(tr => dot(tr.x, tr.y, '#ffd26b', 2.2));
+      if (isNight) dot(monster.x, monster.y, '#ff5757', 3.4);
+
+      ctx.restore();
+
+      const toCampX = (camp.x - player.x) * scale;
+      const toCampY = (camp.y - player.y) * scale;
+      const ang = Math.atan2(toCampY, toCampX);
+      const arrowR = mapR - 12;
+      const ax = mapX + mapR + Math.cos(ang) * arrowR;
+      const ay = mapY + mapR + Math.sin(ang) * arrowR;
+      ctx.fillStyle = '#ffcf7a';
+      ctx.beginPath();
+      ctx.moveTo(ax + Math.cos(ang) * 8, ay + Math.sin(ang) * 8);
+      ctx.lineTo(ax + Math.cos(ang + 2.4) * 6, ay + Math.sin(ang + 2.4) * 6);
+      ctx.lineTo(ax + Math.cos(ang - 2.4) * 6, ay + Math.sin(ang - 2.4) * 6);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(mapX + mapR, mapY + mapR, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#d6e5ff';
+      ctx.font = '12px sans-serif';
+      ctx.fillText('Map', mapX + 8, mapY + mapR * 2 + 16);
+    }
+
+    function drawInventory() {
+      const x = W - 352, y = H - 278, w = 332, h = 258;
+      ctx.fillStyle = 'rgba(8,14,28,.9)';
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = '#6d92ff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, w, h);
+      ctx.fillStyle = '#d6e5ff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('Inventory+', x + 10, y + 20);
+
+      const usedSlots = [wood, stones, fiber, ore, cloth, water, meat, herbs, hide, rope, traps].filter(v => v > 0).length + (hasPickaxe ? 1 : 0);
+      const capacity = 22 + upgradesCount;
+      const weight = wood + stones + (ore * 2) + (hide * 2) + rope + cloth + meat;
+
+      ctx.font = '12px sans-serif';
+      ctx.fillStyle = '#9ed0ff';
+      ctx.fillText(`Slots: ${usedSlots}/${capacity}   Weight: ${weight}`, x + 10, y + 38);
+
+      ctx.font = '13px sans-serif';
+      ctx.fillStyle = '#fff';
+      const left = [
+        `Wood: ${wood}`,
+        `Stone: ${stones}`,
+        `Fiber: ${fiber}`,
+        `Ore: ${ore}`,
+        `Cloth: ${cloth}`,
+        `Rope: ${rope}`,
+        `Herbs: ${herbs}`
+      ];
+      const right = [
+        `Water: ${water}`,
+        `Meat: ${meat}`,
+        `Hide: ${hide}`,
+        `Traps: ${traps}`,
+        `Walls: ${wallList.length}`,
+        `Furniture: ${furnitureList.length}`,
+        `Pickaxe: ${hasPickaxe ? 'Yes' : 'No'}`
+      ];
+
+      left.forEach((t, i) => ctx.fillText(t, x + 10, y + 62 + i * 24));
+      right.forEach((t, i) => ctx.fillText(t, x + 170, y + 62 + i * 24));
+
+      ctx.fillStyle = torchTimerMs > 0 ? '#99f3b1' : '#ffcc9e';
+      ctx.fillText(`Torch: ${torchTimerMs > 0 ? 'Lit' : 'Off'}`, x + 10, y + h - 14);
+      ctx.fillStyle = '#c5d7ff';
+      ctx.fillText('POI Gather: E near Pond/Grove/Ruins', x + 132, y + h - 30);
+      if (!document.body.classList.contains('device-mobile')) {
+        ctx.fillStyle = '#ffe59b';
+        ctx.fillText('PC Tip: Press R for Rulebook · Press X to eat meat', x + 132, y + h - 14);
+      }
+    }
+
+    function drawWarnings() {
+      if (gameOver) return;
+      const nearStation = dist(player.x, player.y, craftStation.x, craftStation.y) <= craftStation.r + 32;
+      if (nearStation) {
+        ctx.fillStyle = '#d6e5ff';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillText('Craft Station nearby: open menu with C. Craft Wall/Furniture here.', 20, 28);
+      }
+
+      if (!isNight) return;
+      ctx.font = 'bold 16px sans-serif';
+      if (!fireBuilt) {
+        ctx.fillStyle = '#ffd6d6';
+        ctx.fillText('No campfire! Fuel at camp with E.', 20, 52);
+      } else if (!playerSafeAtNight()) {
+        ctx.fillStyle = '#ffd6d6';
+        ctx.fillText('Outside fire radius! Get back to campfire light!', 20, 52);
+      } else {
+        ctx.fillStyle = '#e9ffd7';
+        ctx.fillText('You are safe in firelight.', 20, 52);
+      }
+    }
+
+    function drawRulebook() {
+      if (!rulebookOpen) return;
+      const x = W * 0.12, y = H * 0.08, w = W * 0.76, h = H * 0.84;
+      ctx.fillStyle = 'rgba(4,9,20,.86)';
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = '#7ca0ff';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x, y, w, h);
+
+      ctx.fillStyle = '#e4edff';
+      ctx.font = 'bold 26px sans-serif';
+      ctx.fillText('Rulebook', x + 22, y + 38);
+
+      const lines = [
+        '• Goal: survive nights, upgrade campfire, and outlast the monster.',
+        '• Movement: WASD/Arrows or mobile joystick.',
+        '• E: Interact (campfire, gather, chop/mine, open chests).',
+        '• R: toggle this Rulebook on PC.',
+        '• Q: place trap (cost 3 wood + 2 stone).',
+        '• T: light torch (cost 8 wood).',
+        '• C: open/close craft menu.',
+        '• Crafting: 1-8 quick craft on PC, or C + ▲/▼ + Craft on mobile.',
+        '• Campfire: once a fire level upgrades, it keeps 20% power.',
+        '• Gather extra resources at POIs: Pond/ Grove/ Ruins.'
+      ];
+      ctx.font = '17px sans-serif';
+      lines.forEach((line, i) => ctx.fillText(line, x + 24, y + 78 + i * 34));
+
+      ctx.fillStyle = '#ffe59b';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText('Press R (PC) or Rulebook button (mobile) to close', x + 24, y + h - 24);
+    }
+
+    function drawJumpscare() {
+      if (jumpscareTimer <= 0) return;
+      const t = jumpscareTimer / 90;
+      const alpha = Math.min(1, 1 - t + 0.2);
+
+      // violent red-black strobe
+      const flash = jumpscareTimer % 6 < 3 ? 1 : 0;
+      ctx.fillStyle = `rgba(${flash ? 170 : 50},0,0,${alpha * 0.82})`;
+      ctx.fillRect(0, 0, W, H);
+
+      const cx = W / 2 + (Math.random() - 0.5) * 14;
+      const cy = H / 2 + (Math.random() - 0.5) * 14;
+      const size = 160 + (1 - t) * 320;
+
+      ctx.fillStyle = '#070000';
+      ctx.beginPath();
+      ctx.arc(cx, cy, size * 0.46, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(cx - size * 0.14, cy - size * 0.08, size * 0.075, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + size * 0.14, cy - size * 0.08, size * 0.075, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff0000';
+      ctx.beginPath(); ctx.arc(cx - size * 0.14, cy - size * 0.08, size * 0.042, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + size * 0.14, cy - size * 0.08, size * 0.042, 0, Math.PI * 2); ctx.fill();
+
+      ctx.strokeStyle = '#ff2e2e';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(cx - size * 0.20, cy + size * 0.1);
+      ctx.lineTo(cx - size * 0.12, cy + size * 0.24);
+      ctx.lineTo(cx - size * 0.04, cy + size * 0.11);
+      ctx.lineTo(cx + size * 0.04, cy + size * 0.24);
+      ctx.lineTo(cx + size * 0.12, cy + size * 0.11);
+      ctx.lineTo(cx + size * 0.20, cy + size * 0.24);
+      ctx.stroke();
+
+      jumpscareTimer -= 1;
+    }
+
+    function drawGameOver() {
+      if (!gameOver || jumpscareTimer > 0) return;
+      ctx.fillStyle = 'rgba(0,0,0,.58)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 44px sans-serif';
+      ctx.fillText('Game Over', W / 2 - 125, H / 2 - 14);
+      ctx.font = '20px sans-serif';
+      ctx.fillText(`Nights survived: ${survivedNights}`, W / 2 - 96, H / 2 + 22);
+      ctx.fillText('Press Restart to play again', W / 2 - 115, H / 2 + 54);
+    }
+
+    function tick() {
+      if (!gameOver && !rulebookOpen) {
+        updatePlayer();
+        updateMonster();
+        updateCycle();
+      }
+
+      camX = clamp(player.x - W / 2, 0, WORLD_W - W);
+      camY = clamp(player.y - H / 2, 0, WORLD_H - H);
+
+      ctx.save();
+      ctx.translate(-camX, -camY);
+
+      drawBackground();
+      drawPointsOfInterest();
+      drawCampfire();
+      drawCraftStation();
+      drawTrees();
+      drawRocks();
+      drawChests();
+      drawAnimals();
+      drawWallsAndFurniture();
+      drawTraps();
+      drawPlayer();
+      drawMonster();
+      ctx.restore();
+
+      drawOverlay();
+      drawMiniMap();
+      drawInventory();
+      drawWarnings();
+      drawFirePowerBar();
+      drawEnergyBar();
+      drawCraftPanelCanvas();
+      drawRulebook();
+      drawJumpscare();
+      drawGameOver();
+
+      requestAnimationFrame(tick);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (!gameStarted) return;
+      if (document.body.classList.contains('device-mobile')) return;
+      const k = e.key.toLowerCase();
+
+      if (k === 'r') {
+        rulebookOpen = !rulebookOpen;
+        return;
+      }
+
+      if (rulebookOpen) {
+        return;
+      }
+
+      if (k === 'c') {
+        craftOpen = !craftOpen;
+        renderCraftPanel();
+        return;
+      }
+
+      if (craftOpen) {
+        if (k === 'arrowup' || k === 'w') {
+          craftIndex = (craftIndex - 1 + CRAFT_OPTIONS.length) % CRAFT_OPTIONS.length;
+          renderCraftPanel();
+        } else if (k === 'arrowdown' || k === 's') {
+          craftIndex = (craftIndex + 1) % CRAFT_OPTIONS.length;
+          renderCraftPanel();
+        } else if (k === 'enter' || k === 'e') {
+          craftUpgrade(CRAFT_OPTIONS[craftIndex].slot);
+        } else if (k >= '1' && k <= '8') {
+          craftIndex = Number(k) - 1;
+          craftUpgrade(k);
+          renderCraftPanel();
+        }
+        return;
+      }
+
+      keys[k] = true;
+      if (k === 'e') interact();
+      if (k === 'q') craftTrap();
+      if (k === 't') igniteTorch();
+      if (k === 'x') consumeFood();
+      if (k >= '1' && k <= '8') craftUpgrade(k);
+      if (k === 'f') tryBuildFire(); // alias for old control
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (document.body.classList.contains('device-mobile')) return;
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    document.querySelectorAll('.mobile-actions button').forEach((btn) => {
+      const key = btn.dataset.key;
+      const press = (ev) => {
+        ev.preventDefault();
+        if (!gameStarted) return;
+        initAudio();
+
+        if (key === 'rulebook') {
+          rulebookOpen = !rulebookOpen;
+          return;
+        }
+
+        if (rulebookOpen) {
+          if (key === 'e') rulebookOpen = false;
+          return;
+        }
+
+        if (key === 'e') interact();
+        if (key === 'fuel') tryBuildFire();
+        if (key === 'q') craftTrap();
+        if (key === 't') igniteTorch();
+        if (key === 'eat') consumeFood();
+        if (key === 'c') { craftOpen = !craftOpen; renderCraftPanel(); }
+
+        if (key === 'craft-up' && craftOpen) {
+          craftIndex = (craftIndex - 1 + CRAFT_OPTIONS.length) % CRAFT_OPTIONS.length;
+          renderCraftPanel();
+        }
+        if (key === 'craft-down' && craftOpen) {
+          craftIndex = (craftIndex + 1) % CRAFT_OPTIONS.length;
+          renderCraftPanel();
+        }
+        if (key === 'craft-make' && craftOpen) {
+          craftUpgrade(CRAFT_OPTIONS[craftIndex].slot);
+        }
+      };
+      btn.addEventListener('touchstart', press, { passive: false });
+      btn.addEventListener('mousedown', press);
+    });
+
+    function setJoystickFromEvent(ev) {
+      const touch = ev.touches ? ev.touches[0] : ev;
+      const rect = joystickEl.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      let dx = touch.clientX - cx;
+      let dy = touch.clientY - cy;
+      const maxR = rect.width * 0.34;
+      const len = Math.hypot(dx, dy) || 1;
+      if (len > maxR) { dx = (dx / len) * maxR; dy = (dy / len) * maxR; }
+      joyDx = dx / maxR;
+      joyDy = dy / maxR;
+      joyKnobEl.style.left = `${42 + dx}px`;
+      joyKnobEl.style.top = `${42 + dy}px`;
+    }
+
+    function resetJoystick() {
+      joyDx = 0; joyDy = 0; joyActive = false;
+      joyKnobEl.style.left = '42px';
+      joyKnobEl.style.top = '42px';
+    }
+
+    joystickEl.addEventListener('touchstart', (ev) => {
+      ev.preventDefault();
+      if (!gameStarted) return;
+      initAudio();
+      joyActive = true;
+      setJoystickFromEvent(ev);
+    }, { passive: false });
+    joystickEl.addEventListener('touchmove', (ev) => {
+      ev.preventDefault();
+      if (!joyActive) return;
+      setJoystickFromEvent(ev);
+    }, { passive: false });
+    joystickEl.addEventListener('touchend', (ev) => { ev.preventDefault(); resetJoystick(); }, { passive: false });
+
+    joystickEl.addEventListener('mousedown', (ev) => {
+      if (!gameStarted) return;
+      initAudio();
+      joyActive = true;
+      setJoystickFromEvent(ev);
+    });
+    window.addEventListener('mousemove', (ev) => { if (joyActive) setJoystickFromEvent(ev); });
+    window.addEventListener('mouseup', () => { if (joyActive) resetJoystick(); });
+
+    restartBtn.addEventListener('click', () => {
+      initAudio();
+      reset();
+    });
+
+    if (isIOS) {
+      document.body.classList.add('ios-device');
+      startMobileBtn.textContent = 'iPhone / iPad';
+      startPcBtn.textContent = 'PC (Keyboard)';
+      fullscreenBtn.textContent = 'iOS: Use Add to Home Screen';
+    }
+
+    fullscreenBtn.addEventListener('click', async () => {
+      if (isIOS) return;
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (_) {}
+    });
+
+    // unlock audio on first click/keypress
+    const unlock = () => { initAudio(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+
+    if (isTouchDevice) {
+      window.addEventListener('touchmove', (e) => {
+        if (gameStarted && document.body.classList.contains('device-mobile')) e.preventDefault();
+      }, { passive: false });
+      window.addEventListener('gesturestart', (e) => e.preventDefault());
+      window.addEventListener('gesturechange', (e) => e.preventDefault());
+    }
+
+    function startGame(device) {
+      if (gameStarted) return;
+      gameStarted = true;
+      document.body.classList.toggle('device-mobile', device === 'mobile');
+      startOverlay.style.display = 'none';
+      initAudio();
+      reset();
+      tick();
+    }
+
+    startPcBtn.addEventListener('click', () => startGame('pc'));
+    startMobileBtn.addEventListener('click', () => startGame('mobile'));
+
+    if (isProbablyMobile) {
+      startGame('mobile');
+    }
+  </script>
+</body>
+</html>

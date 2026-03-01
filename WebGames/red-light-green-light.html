@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Red Light, Green Light Mini-Game</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+      background: radial-gradient(circle at 20% 0%, #1f294f, #0e1224 65%);
+      color: #fff;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+    .game {
+      width: min(980px, 96vw);
+      background: rgba(14, 19, 38, .86);
+      border: 1px solid #2a3568;
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 18px 55px rgba(0,0,0,.38);
+    }
+    h1 { margin: 0 0 8px; }
+    p { margin: 6px 0; opacity: .92; }
+
+    .hud {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .chip {
+      background: #101734;
+      border: 1px solid #32407d;
+      border-radius: 12px;
+      padding: 10px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .track {
+      position: relative;
+      height: 170px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid #2d3b73;
+      background: linear-gradient(180deg, #85d1ff 0%, #79c4f3 40%, #6cc06f 41%, #5aac5f 100%);
+    }
+    .finish {
+      position: absolute;
+      right: 70px;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      background: repeating-linear-gradient(180deg, #fff, #fff 8px, #111 8px, #111 16px);
+      box-shadow: 0 0 0 3px rgba(255,255,255,.15);
+    }
+    .doll {
+      position: absolute;
+      right: 16px;
+      top: 20px;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: #ffd08c;
+      border: 2px solid #222;
+      display: grid;
+      place-items: center;
+      font-size: 24px;
+      transform: rotateY(180deg);
+      transition: transform .2s ease;
+      transform-style: preserve-3d;
+    }
+    .doll.turning {
+      animation: headTurn .22s ease;
+    }
+    @keyframes headTurn {
+      0% { transform: rotateY(90deg); }
+      100% { }
+    }
+
+    .player {
+      position: absolute;
+      left: 14px;
+      bottom: 24px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid #101a3e;
+      box-shadow: 0 0 0 6px rgba(255,255,255,.18);
+      transition: left .05s linear;
+    }
+
+    .light {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+    .light.green { background: #184b20; color: #86ffa0; border: 1px solid #2e8f45; }
+    .light.red { background: #4a1a1a; color: #ff9898; border: 1px solid #d45050; }
+    .light.flash-green {
+      animation: flashGreen .22s ease-in-out;
+    }
+    @keyframes flashGreen {
+      0%, 100% { filter: brightness(1); box-shadow: none; }
+      50% { filter: brightness(1.85); box-shadow: 0 0 0 4px rgba(134,255,160,.35); }
+    }
+
+    .actions { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    #startBtn { background: #4e7cff; color: #fff; }
+    #resetBtn { background: #2a335f; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="game">
+    <h1>Red Light, Green Light 🎯</h1>
+    <p>Press <strong>Space</strong> to move forward. Move on green light; if you move on red, you lose.</p>
+
+    <div id="light" class="light green">🟢 Green Light (Move)</div>
+
+    <div class="hud">
+      <div class="chip">Time Left<br><span id="time">30.0</span>s</div>
+      <div class="chip">Distance to Finish<br><span id="dist">100</span></div>
+      <div class="chip">Status<br><span id="state">Ready</span></div>
+      <div class="chip">Best Time<br><span id="best">--</span></div>
+    </div>
+
+    <div class="track" id="track">
+      <div class="finish"></div>
+      <div class="doll" id="doll">👧</div>
+      <div class="player" id="player"></div>
+    </div>
+
+    <p id="msg">Click Start, then mash Space to reach the finish line.</p>
+
+    <div class="actions">
+      <button id="startBtn">Start</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+  </div>
+
+  <script>
+    const player = document.getElementById('player');
+    const doll = document.getElementById('doll');
+    const light = document.getElementById('light');
+    const timeEl = document.getElementById('time');
+    const distEl = document.getElementById('dist');
+    const stateEl = document.getElementById('state');
+    const bestEl = document.getElementById('best');
+    const msg = document.getElementById('msg');
+
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const TRACK_LEFT = 14;
+    const FINISH_X = 860;
+    let x = TRACK_LEFT;
+
+    let playing = false;
+    let green = true;
+    let timeLeft = 30;
+    let ended = false;
+    let timer = null;
+    let switchTimer = null;
+
+    const STEP = 14;
+
+    let audioCtx = null;
+    let musicGain = null;
+    let musicTimer = null;
+
+    function ensureAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        musicGain = audioCtx.createGain();
+        musicGain.gain.value = 0.045;
+        musicGain.connect(audioCtx.destination);
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function beep(freq = 440, duration = 0.08, type = 'sine', volume = 0.08, when = 0) {
+      if (!audioCtx) return;
+      const t0 = audioCtx.currentTime + when;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(volume, t0 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t0);
+      osc.stop(t0 + duration + 0.02);
+    }
+
+    function startMusic() {
+      stopMusic();
+      if (!audioCtx || !musicGain) return;
+      const notes = [392, 440, 523.25, 440, 349.23, 392, 440, 392];
+      let i = 0;
+      musicTimer = setInterval(() => {
+        if (!playing || ended) return;
+        const f = notes[i % notes.length];
+        i++;
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = f;
+        g.gain.value = 0.001;
+        g.gain.linearRampToValueAtTime(0.35, audioCtx.currentTime + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.23);
+        osc.connect(g);
+        g.connect(musicGain);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+      }, 260);
+    }
+
+    function stopMusic() {
+      if (musicTimer) {
+        clearInterval(musicTimer);
+        musicTimer = null;
+      }
+    }
+
+    function playSwitchSfx(isGreen) {
+      if (isGreen) {
+        beep(740, 0.07, 'square', 0.07);
+        beep(988, 0.09, 'square', 0.06, 0.06);
+      } else {
+        beep(300, 0.1, 'sawtooth', 0.08);
+        beep(220, 0.12, 'sawtooth', 0.07, 0.08);
+      }
+    }
+
+    function playStepSfx() {
+      beep(620 + Math.random() * 120, 0.035, 'square', 0.03);
+    }
+
+    function playLoseSfx() {
+      beep(320, 0.1, 'sawtooth', 0.1);
+      beep(250, 0.12, 'sawtooth', 0.1, 0.08);
+      beep(180, 0.15, 'sawtooth', 0.09, 0.17);
+    }
+
+    function playWinSfx() {
+      beep(523.25, 0.08, 'triangle', 0.09);
+      beep(659.25, 0.08, 'triangle', 0.09, 0.09);
+      beep(783.99, 0.12, 'triangle', 0.1, 0.18);
+    }
+
+    function loadBest() {
+      const v = localStorage.getItem('rlgl_best_time');
+      if (v) bestEl.textContent = Number(v).toFixed(2) + 's';
+    }
+
+    function saveBest(t) {
+      const old = Number(localStorage.getItem('rlgl_best_time') || '0');
+      if (!old || t < old) {
+        localStorage.setItem('rlgl_best_time', String(t));
+      }
+      loadBest();
+    }
+
+    function animateDollTurn() {
+      doll.classList.remove('turning');
+      // force reflow for replaying the animation
+      void doll.offsetWidth;
+      doll.classList.add('turning');
+    }
+
+    function setLight(isGreen) {
+      green = isGreen;
+      animateDollTurn();
+      if (green) {
+        light.className = 'light green';
+        light.textContent = '🟢 Green Light (Move)';
+        doll.style.transform = 'rotateY(180deg)';
+      } else {
+        light.className = 'light red';
+        light.textContent = '🔴 Red Light (Stop)';
+        doll.style.transform = 'rotateY(0deg)';
+      }
+      playSwitchSfx(isGreen);
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function flashGreenWarning(times = 3) {
+      if (!playing || ended || !green) return;
+      for (let i = 0; i < times; i++) {
+        if (!playing || ended || !green) return;
+        light.classList.add('flash-green');
+        beep(1120, 0.06, 'square', 0.06);
+        await sleep(140);
+        light.classList.remove('flash-green');
+        await sleep(120);
+      }
+    }
+
+    function scheduleSwitch() {
+      if (!playing || ended) return;
+
+      if (green) {
+        const totalGreen = 1700 + Math.random() * 2200;
+        const warningWindow = 900;
+
+        clearTimeout(switchTimer);
+        switchTimer = setTimeout(async () => {
+          if (!playing || ended || !green) return;
+          await flashGreenWarning(3);
+          if (!playing || ended || !green) return;
+          setLight(false);
+          scheduleSwitch();
+        }, Math.max(400, totalGreen - warningWindow));
+      } else {
+        const redDelay = 900 + Math.random() * 1700;
+        clearTimeout(switchTimer);
+        switchTimer = setTimeout(() => {
+          if (!playing || ended) return;
+          setLight(true);
+          scheduleSwitch();
+        }, redDelay);
+      }
+    }
+
+    function updatePlayer() {
+      player.style.left = `${x}px`;
+      const progress = Math.max(0, Math.round(((x - TRACK_LEFT) / (FINISH_X - TRACK_LEFT)) * 100));
+      distEl.textContent = String(Math.max(0, 100 - progress));
+    }
+
+    function finish(win, reason = '') {
+      ended = true;
+      playing = false;
+      clearInterval(timer);
+      clearTimeout(switchTimer);
+      stopMusic();
+
+      if (win) {
+        stateEl.textContent = 'Win';
+        const used = 30 - timeLeft;
+        msg.textContent = `🏁 You win! Time: ${used.toFixed(2)}s.`;
+        playWinSfx();
+        saveBest(used);
+      } else {
+        stateEl.textContent = 'Lose';
+        msg.textContent = reason || 'You lost.';
+        playLoseSfx();
+      }
+    }
+
+    function startGame() {
+      ensureAudio();
+      x = TRACK_LEFT;
+      updatePlayer();
+      timeLeft = 30;
+      ended = false;
+      playing = true;
+      stateEl.textContent = 'In Progress';
+      msg.textContent = 'Go! Run on green, stop on red.';
+
+      setLight(true);
+      scheduleSwitch();
+      startMusic();
+
+      clearInterval(timer);
+      timer = setInterval(() => {
+        if (!playing || ended) return;
+        timeLeft -= 0.1;
+        if (timeLeft <= 0) {
+          timeLeft = 0;
+          timeEl.textContent = timeLeft.toFixed(1);
+          finish(false, '⏰ Time is up. You failed the round.');
+          return;
+        }
+        timeEl.textContent = timeLeft.toFixed(1);
+      }, 100);
+    }
+
+    function resetGame() {
+      playing = false;
+      ended = false;
+      clearInterval(timer);
+      clearTimeout(switchTimer);
+      stopMusic();
+      x = TRACK_LEFT;
+      timeLeft = 30;
+      setLight(true);
+      updatePlayer();
+      timeEl.textContent = timeLeft.toFixed(1);
+      stateEl.textContent = 'Ready';
+      msg.textContent = 'Click Start, then mash Space to reach the finish line.';
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'Space') return;
+      e.preventDefault();
+
+      if (!playing || ended) return;
+
+      if (!green) {
+        finish(false, '💥 You moved on red light. Eliminated!');
+        return;
+      }
+
+      x += STEP;
+      playStepSfx();
+      updatePlayer();
+
+      if (x >= FINISH_X) {
+        finish(true);
+      }
+    });
+
+    startBtn.addEventListener('click', startGame);
+    resetBtn.addEventListener('click', resetGame);
+
+    loadBest();
+    resetGame();
+  </script>
+</body>
+</html>
