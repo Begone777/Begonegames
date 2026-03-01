@@ -52,7 +52,7 @@
   let spawnTimer, laserTimer;
   let extraLifeMsg, nextLifeScore;
   let waveCharge, waveActive, waveRing;
-  let shakeT, shakeP;
+  let shakeT, shakeP, shakeDur;
   let boss, bossNextScore, bossWaveMsg;
   let showHitboxes;
 
@@ -92,6 +92,7 @@
 
     shakeT = 0;
     shakeP = 0;
+    shakeDur = 0;
 
     boss = null;
     bossNextScore = randInt(1500, 2001);
@@ -160,10 +161,17 @@
     lives--;
     livesEl.textContent = String(lives);
     invincible = 1.0;
-    shakeT = 4.0;
-    shakeP = 10;
+    if (lives <= 0) {
+      shakeDur = 5.0;
+      shakeT = 5.0;
+      shakeP = 12;
+      running = false;
+    } else {
+      shakeDur = 2.0;
+      shakeT = 2.0;
+      shakeP = 10;
+    }
     for (let i=0;i<12;i++) particles.push({x:player.x,y:player.y,vx:rand(-120,120),vy:rand(-120,120),a:0,l:rand(.2,.45),s:rand(2,5),c:'rgba(110,203,255,1)'});
-    if (lives <= 0) running = false;
   }
 
   function awardLives(scoreInt) {
@@ -194,6 +202,14 @@
   }
 
   function update(dt) {
+    if (shakeT > 0) {
+      shakeT -= dt;
+      const tNorm = Math.max(0, shakeT / Math.max(0.001, shakeDur));
+      shakeP = 12 * tNorm;
+    } else {
+      shakeP = 0;
+    }
+
     if (!running) return;
     t += dt;
     bgY += dt * 30;
@@ -203,11 +219,6 @@
     if (waveActive > 0) waveActive -= dt;
     if (waveRing > 0) waveRing -= dt;
     if (bossWaveMsg > 0) bossWaveMsg -= dt;
-    if (shakeT > 0) {
-      shakeT -= dt;
-      const tNorm = Math.max(0, shakeT / 4.0);
-      shakeP = 10 * tNorm;
-    }
 
     waveCharge = Math.min(100, waveCharge + dt * 2); // 1% every 0.5s
     waveEl.textContent = `${Math.floor(waveCharge)}%`;
@@ -521,10 +532,13 @@
       ctx.strokeRect(player.x-18, player.y-20, 36, 40);
 
       // meteor hitboxes
-      ctx.strokeStyle = 'rgba(255,170,110,0.7)';
+      ctx.strokeStyle = 'rgba(255,190,130,0.98)';
+      ctx.lineWidth = 2;
       for (const m of meteors) {
+        ctx.fillStyle = 'rgba(255,150,100,0.12)';
         ctx.beginPath();
         ctx.arc(m.x, m.y, m.r*0.9, 0, Math.PI*2);
+        ctx.fill();
         ctx.stroke();
       }
 
