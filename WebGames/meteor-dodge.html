@@ -445,13 +445,14 @@ function drawBackground() {
 }
 
 function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  const sx = shakeTimer > 0 ? rand(-shakePower, shakePower) : 0;
+  const sy = shakeTimer > 0 ? rand(-shakePower, shakePower) : 0;
+
   ctx.save();
-  if (shakeTimer > 0) {
-    const sx = rand(-shakePower, shakePower);
-    const sy = rand(-shakePower, shakePower);
-    ctx.translate(sx, sy);
-  }
-  ctx.clearRect(-30, -30, W + 60, H + 60);
+  ctx.translate(sx, sy);
   drawBackground();
   drawLasers();
 
