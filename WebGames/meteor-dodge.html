@@ -171,7 +171,7 @@
       shakeP = 10 * tNorm;
     }
 
-    waveCharge = Math.min(100, waveCharge + dt * 6); // slower charge
+    waveCharge = Math.min(100, waveCharge + dt * 2); // 1% every 0.5s
     waveEl.textContent = `${Math.floor(waveCharge)}%`;
 
     let dir = 0;
