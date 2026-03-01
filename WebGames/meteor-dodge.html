@@ -187,7 +187,7 @@
     shakeDur = 0;
 
     boss = null;
-    bossNextScore = randInt(2000, 2501);
+    bossNextScore = 250;
     bossWaveMsg = 0;
 
     showHitboxes = false;
@@ -367,7 +367,7 @@
 
     if (!boss && scoreInt >= bossNextScore) {
       spawnBoss();
-      bossNextScore += randInt(2000, 2501);
+      bossNextScore += randInt(2000, 2501); // subsequent bosses keep normal cadence
     }
 
     if (!boss) {
