@@ -136,7 +136,7 @@
       <div class="chip">Nights Survived: <span id="score">0</span></div>
     </div>
     <div class="hint">
-      Move: <b>WASD / Arrow Keys</b> · <b>E</b> = interact (tree/rock/camp) · <b>Q</b> trap · <b>T</b> torch · <b>C</b> craft menu.<br>
+      Move: <b>WASD / Arrow Keys</b> · <b>E</b> interact · <b>Q</b> trap · <b>T</b> torch · <b>V</b> place crafting table · <b>C</b> craft menu.<br>
       In craft menu: <b>Click</b> an item to craft. Wall/Furniture require standing near Craft Station.
     </div>
     <canvas id="game" width="1240" height="760"></canvas>
@@ -193,6 +193,8 @@
     let wood, stones, traps, health, maxHealth, fireBuilt, gameOver, firePower, fireLevel, torchTimerMs, energy;
     let fiber, ore, cloth, water, meat, herbs, hide, rope;
     let hasPickaxe, axePower, minePower, torchDurationBonusMs, torchRadiusBonus, trapSlowBonus, upgradesCount;
+    let bootsLevel, jacketLevel, axeLevel, lanternLevel, trapperLevel;
+    let hasCraftTable;
     let dayNightTimer, isNight, survivedNights, currentNightMs;
     let footstepCooldown = 0;
     let gameStarted = false;
@@ -221,26 +223,32 @@
     const TORCH_DURATION_MS = 15000;
     const TORCH_SAFE_RADIUS = 95;
 
-    const RECIPES = {
+    const REGULAR_RECIPES = {
       pickaxe: { wood: 6, stone: 0 },
-      boots: { wood: 6, stone: 4 },
-      jacket: { wood: 8, stone: 6 },
-      axe: { wood: 7, stone: 3 },
-      lantern: { wood: 6, stone: 5 },
-      trapper: { wood: 8, stone: 8 },
-      wall: { wood: 5, stone: 2 },
-      furniture: { wood: 4, stone: 1 }
+      boots1: { wood: 6, stone: 4 },
+      boots2: { wood: 10, stone: 8 },
+      jacket1: { wood: 8, stone: 6 },
+      jacket2: { wood: 12, stone: 10 },
+      axe1: { wood: 7, stone: 3 },
+      axe2: { wood: 12, stone: 9 },
+      lantern1: { wood: 6, stone: 5 },
+      lantern2: { wood: 10, stone: 9 },
+      trapper1: { wood: 8, stone: 8 },
+      trapper2: { wood: 14, stone: 14 }
     };
 
-    const CRAFT_OPTIONS = [
-      { slot: '1', key: 'pickaxe', name: 'Pickaxe', desc: 'Unlock rock mining' },
-      { slot: '2', key: 'boots', name: 'Boots', desc: '+Speed' },
-      { slot: '3', key: 'jacket', name: 'Jacket', desc: '+Max HP' },
-      { slot: '4', key: 'axe', name: 'Axe+', desc: '+Tree damage' },
-      { slot: '5', key: 'lantern', name: 'Lantern', desc: '+Torch power' },
-      { slot: '6', key: 'trapper', name: 'Trap+', desc: '+Trap slow time' },
-      { slot: '7', key: 'wall', name: 'Wall Kit', desc: 'Station-only, defensive wall' },
-      { slot: '8', key: 'furniture', name: 'Furniture', desc: 'Station-only comfort furniture' }
+    const TABLE_RECIPES = {
+      wall: { wood: 5, stone: 2 },
+      furniture: { wood: 4, stone: 1 },
+      barricade: { wood: 10, stone: 8 },
+      firecore: { wood: 12, stone: 12 }
+    };
+
+    const TABLE_CRAFT_OPTIONS = [
+      { slot: '1', key: 'wall', name: 'Wall Kit', desc: 'Defensive wall' },
+      { slot: '2', key: 'furniture', name: 'Furniture', desc: 'Comfort furniture' },
+      { slot: '3', key: 'barricade', name: 'Barricade', desc: 'Heavy wall' },
+      { slot: '4', key: 'firecore', name: 'Fire Core', desc: 'Fire burns longer' }
     ];
 
     // --- audio ---
@@ -371,6 +379,12 @@
       torchRadiusBonus = 0;
       trapSlowBonus = 0;
       upgradesCount = 0;
+      bootsLevel = 0;
+      jacketLevel = 0;
+      axeLevel = 0;
+      lanternLevel = 0;
+      trapperLevel = 0;
+      hasCraftTable = true;
       fireBuilt = false;
       firePower = 0;
       fireLevel = 0;
@@ -640,36 +654,56 @@
       return true;
     }
 
-    function craftUpgrade(slot) {
+    function craftRegular(slot) {
       if (gameOver) return;
       let crafted = false;
-      const nearStation = dist(player.x, player.y, craftStation.x, craftStation.y) <= craftStation.r + 28;
 
-      if (slot === '1' && !hasPickaxe && spend(RECIPES.pickaxe)) {
+      if (slot === '1' && !hasPickaxe && spend(REGULAR_RECIPES.pickaxe)) {
         hasPickaxe = true;
         crafted = true;
-      } else if (slot === '2' && spend(RECIPES.boots)) {
-        player.baseSpeed += 0.45;
-        crafted = true;
-      } else if (slot === '3' && spend(RECIPES.jacket)) {
-        maxHealth += 25;
-        health = Math.min(maxHealth, health + 25);
-        crafted = true;
-      } else if (slot === '4' && spend(RECIPES.axe)) {
-        axePower += 1;
-        crafted = true;
-      } else if (slot === '5' && spend(RECIPES.lantern)) {
-        torchDurationBonusMs += 6000;
-        torchRadiusBonus += 20;
-        crafted = true;
-      } else if (slot === '6' && spend(RECIPES.trapper)) {
-        trapSlowBonus += 60;
-        crafted = true;
-      } else if (slot === '7' && nearStation && spend(RECIPES.wall)) {
+      } else if (slot === '2' && bootsLevel < 2) {
+        const recipe = bootsLevel === 0 ? REGULAR_RECIPES.boots1 : REGULAR_RECIPES.boots2;
+        if (spend(recipe)) { bootsLevel += 1; player.baseSpeed += bootsLevel === 1 ? 0.45 : 0.55; crafted = true; }
+      } else if (slot === '3' && jacketLevel < 2) {
+        const recipe = jacketLevel === 0 ? REGULAR_RECIPES.jacket1 : REGULAR_RECIPES.jacket2;
+        if (spend(recipe)) { jacketLevel += 1; maxHealth += jacketLevel === 1 ? 25 : 35; health = Math.min(maxHealth, health + 30); crafted = true; }
+      } else if (slot === '4' && axeLevel < 2) {
+        const recipe = axeLevel === 0 ? REGULAR_RECIPES.axe1 : REGULAR_RECIPES.axe2;
+        if (spend(recipe)) { axeLevel += 1; axePower += 1; crafted = true; }
+      } else if (slot === '5' && lanternLevel < 2) {
+        const recipe = lanternLevel === 0 ? REGULAR_RECIPES.lantern1 : REGULAR_RECIPES.lantern2;
+        if (spend(recipe)) { lanternLevel += 1; torchDurationBonusMs += lanternLevel === 1 ? 6000 : 8000; torchRadiusBonus += lanternLevel === 1 ? 20 : 28; crafted = true; }
+      } else if (slot === '6' && trapperLevel < 2) {
+        const recipe = trapperLevel === 0 ? REGULAR_RECIPES.trapper1 : REGULAR_RECIPES.trapper2;
+        if (spend(recipe)) { trapperLevel += 1; trapSlowBonus += trapperLevel === 1 ? 60 : 90; crafted = true; }
+      }
+
+      if (crafted) {
+        upgradesCount += 1;
+        sfxBuild();
+        updateHud();
+      }
+    }
+
+    function craftUpgrade(slot) {
+      if (gameOver) return;
+      const nearStation = dist(player.x, player.y, craftStation.x, craftStation.y) <= craftStation.r + 28;
+      if (!nearStation) return;
+
+      let crafted = false;
+      if (slot === '1' && spend(TABLE_RECIPES.wall)) {
         wallList.push({ x: player.x, y: player.y, r: 18, hp: 70, maxHp: 70 });
         crafted = true;
-      } else if (slot === '8' && nearStation && spend(RECIPES.furniture)) {
+      } else if (slot === '2' && spend(TABLE_RECIPES.furniture)) {
         furnitureList.push({ x: player.x, y: player.y, r: 15, type: Math.random() > 0.5 ? 'chair' : 'table' });
+        crafted = true;
+      } else if (slot === '3' && spend(TABLE_RECIPES.barricade)) {
+        wallList.push({ x: player.x, y: player.y, r: 22, hp: 130, maxHp: 130 });
+        crafted = true;
+      } else if (slot === '4' && spend(TABLE_RECIPES.firecore)) {
+        fireLevel = Math.min(FIRE_MAX_LEVEL, fireLevel + 1);
+        fireBuilt = fireLevel > 0 ? true : fireBuilt;
+        firePower = Math.max(firePower, 35);
         crafted = true;
       }
 
@@ -678,6 +712,15 @@
         sfxBuild();
         updateHud();
       }
+    }
+
+    function placeCraftTable() {
+      if (!hasCraftTable) return;
+      const inCampRange = dist(player.x, player.y, camp.x, camp.y) <= currentFireRadius();
+      if (!inCampRange) return;
+      craftStation.x = clamp(player.x + 24, 30, WORLD_W - 30);
+      craftStation.y = clamp(player.y + 24, 30, WORLD_H - 30);
+      sfxBuild();
     }
 
     function nearestPoiInRange() {
@@ -915,7 +958,8 @@
       const prevTorchTimer = torchTimerMs;
       if (fireBuilt) {
         const drainPerSec = isNight ? FIRE_DRAIN_NIGHT_PER_SEC : FIRE_DRAIN_DAY_PER_SEC;
-        firePower = Math.max(0, firePower - drainPerSec * (dt / 1000));
+        const levelBurnBonus = 1 + Math.max(0, fireLevel - 1) * 0.35;
+        firePower = Math.max(0, firePower - (drainPerSec / levelBurnBonus) * (dt / 1000));
         if (firePower <= 0) {
           fireBuilt = false;
           firePower = 0;
@@ -1540,29 +1584,26 @@
     }
 
     function drawHotbar() {
-      const slotW = 88;
-      const slotH = 56;
+      const slotW = 102;
+      const slotH = 58;
       const gap = 10;
-      const items = [
-        { name: 'Axe', active: true, count: '' },
-        { name: 'Pickaxe', active: hasPickaxe, count: hasPickaxe ? '' : 'LOCK' },
-        { name: 'Torch', active: true, count: wood },
-        { name: 'Trap', active: true, count: traps }
-      ];
+      const items = [{ name: 'Axe', active: true, count: '' }];
+      if (hasPickaxe) items.push({ name: 'Pickaxe', active: true, count: '' });
+      if (hasCraftTable) items.push({ name: 'Craft Table', active: true, count: 'V Place' });
 
       const totalW = items.length * slotW + (items.length - 1) * gap;
       const startX = Math.round((W - totalW) / 2);
-      const y = H - 84;
+      const y = H - 86;
 
       items.forEach((it, i) => {
         const x = startX + i * (slotW + gap);
-        ctx.fillStyle = it.active ? 'rgba(13,22,43,.92)' : 'rgba(25,25,25,.86)';
+        ctx.fillStyle = 'rgba(13,22,43,.92)';
         ctx.fillRect(x, y, slotW, slotH);
         ctx.strokeStyle = i === 0 ? '#ffcf7a' : '#6d92ff';
         ctx.lineWidth = i === 0 ? 2.5 : 2;
         ctx.strokeRect(x, y, slotW, slotH);
 
-        ctx.fillStyle = it.active ? '#e6efff' : '#999';
+        ctx.fillStyle = '#e6efff';
         ctx.font = 'bold 12px sans-serif';
         ctx.fillText(it.name, x + 8, y + 18);
 
@@ -1574,32 +1615,35 @@
 
     function drawCraftPanelCanvas() {
       if (!craftOpen) return;
-      const x = W - 380, y = 20, w = 360, h = 270;
-      ctx.fillStyle = 'rgba(8,14,28,.92)';
+      const w = 620, h = 430;
+      const x = Math.round((W - w) / 2);
+      const y = Math.round((H - h) / 2);
+      ctx.fillStyle = 'rgba(8,14,28,.96)';
       ctx.fillRect(x, y, w, h);
       ctx.strokeStyle = '#6d92ff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
       ctx.strokeRect(x, y, w, h);
       ctx.fillStyle = '#d6e5ff';
-      ctx.font = 'bold 15px sans-serif';
-      ctx.fillText('Crafting (C close)', x + 10, y + 22);
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillText('Crafting Table (click an item to craft)', x + 18, y + 34);
 
-      ctx.font = '13px sans-serif';
-      CRAFT_OPTIONS.forEach((opt, idx) => {
-        const c = RECIPES[opt.key];
-        const rowY = y + 48 + idx * 25;
-        const selected = idx === craftIndex;
+      ctx.font = '18px sans-serif';
+      TABLE_CRAFT_OPTIONS.forEach((opt, idx) => {
+        const c = TABLE_RECIPES[opt.key];
+        const rowY = y + 84 + idx * 78;
         const affordable = wood >= c.wood && stones >= c.stone;
-        const done = opt.key === 'pickaxe' && hasPickaxe;
 
-        if (selected) {
-          ctx.fillStyle = 'rgba(255,229,155,.16)';
-          ctx.fillRect(x + 8, rowY - 15, w - 16, 20);
-        }
-        ctx.fillStyle = selected ? '#ffe59b' : '#ffffff';
-        ctx.fillText(`${selected ? '▶ ' : ''}${opt.name}${done ? ' (DONE)' : ''}`, x + 12, rowY);
+        ctx.fillStyle = idx === craftIndex ? 'rgba(255,229,155,.16)' : 'rgba(255,255,255,.04)';
+        ctx.fillRect(x + 14, rowY - 34, w - 28, 64);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(opt.name, x + 26, rowY - 6);
+        ctx.fillStyle = '#b6cfff';
+        ctx.font = '15px sans-serif';
+        ctx.fillText(opt.desc, x + 26, rowY + 16);
+        ctx.font = '18px sans-serif';
         ctx.fillStyle = affordable ? '#99f3b1' : '#ffb3b3';
-        ctx.fillText(`${c.wood}W/${c.stone}S`, x + 235, rowY);
+        ctx.fillText(`${c.wood}W / ${c.stone}S`, x + w - 170, rowY + 6);
       });
     }
 
@@ -1758,7 +1802,8 @@
         '• Q: place trap (cost 3 wood + 2 stone).',
         '• T: light torch (cost 8 wood).',
         '• C: open/close craft menu.',
-        '• Crafting: press C, then click an item in the crafting panel.',
+        '• Regular crafting: keys 1-6 for personal upgrades (not in table panel).',
+        '• Crafting table: press C near the table, then click item to craft.',
         '• Campfire: once a fire level upgrades, it keeps 20% power.',
         '• Gather extra resources at POIs: Pond/ Grove/ Ruins.'
       ];
@@ -1892,6 +1937,8 @@
       if (k === 'q') craftTrap();
       if (k === 't') igniteTorch();
       if (k === 'x') consumeFood();
+      if (k === 'v') placeCraftTable();
+      if (k >= '1' && k <= '6') craftRegular(k);
       if (k === 'f') tryBuildFire(); // alias for old control
     });
 
@@ -1905,19 +1952,19 @@
       const sx = (e.clientX - rect.left) * (canvas.width / rect.width);
       const sy = (e.clientY - rect.top) * (canvas.height / rect.height);
 
-      const panelX = W - 380;
-      const panelY = 20;
-      const panelW = 360;
-      const panelH = 270;
+      const panelW = 620;
+      const panelH = 430;
+      const panelX = Math.round((W - panelW) / 2);
+      const panelY = Math.round((H - panelH) / 2);
       if (sx < panelX || sx > panelX + panelW || sy < panelY || sy > panelY + panelH) return;
 
-      for (let idx = 0; idx < CRAFT_OPTIONS.length; idx++) {
-        const rowY = panelY + 48 + idx * 25;
-        const rowTop = rowY - 15;
-        const rowBottom = rowTop + 20;
+      for (let idx = 0; idx < TABLE_CRAFT_OPTIONS.length; idx++) {
+        const rowY = panelY + 84 + idx * 78;
+        const rowTop = rowY - 34;
+        const rowBottom = rowTop + 64;
         if (sy >= rowTop && sy <= rowBottom) {
           craftIndex = idx;
-          craftUpgrade(CRAFT_OPTIONS[idx].slot);
+          craftUpgrade(TABLE_CRAFT_OPTIONS[idx].slot);
           return;
         }
       }
