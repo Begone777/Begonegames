@@ -136,7 +136,7 @@
       <div class="chip">Nights Survived: <span id="score">0</span></div>
     </div>
     <div class="hint">
-      Move: <b>WASD / Arrow Keys</b> · <b>E</b> interact · <b>Q</b> trap · <b>T</b> torch · <b>V</b> place crafting station · <b>C</b> craft menu · <b>I</b> inventory.<br>
+      Move: <b>WASD / Arrow Keys</b> · <b>E</b> interact · <b>Q</b> trap · <b>T</b> torch · <b>C</b> craft menu · <b>I</b> inventory.<br>
       In craft menu: <b>Click</b> an item to craft. Wall/Furniture require standing near Craft Station.
     </div>
     <canvas id="game" width="1240" height="760"></canvas>
@@ -194,7 +194,7 @@
     let fiber, ore, cloth, water, meat, herbs, hide, rope;
     let hasPickaxe, axePower, minePower, torchDurationBonusMs, torchRadiusBonus, trapSlowBonus, upgradesCount;
     let bootsLevel, jacketLevel, axeLevel, lanternLevel, trapperLevel;
-    let hasCraftTable;
+    let wallKits, furnitureKits;
     let dayNightTimer, isNight, survivedNights, currentNightMs;
     let footstepCooldown = 0;
     let gameStarted = false;
@@ -394,7 +394,8 @@
       axeLevel = 0;
       lanternLevel = 0;
       trapperLevel = 0;
-      hasCraftTable = true;
+      wallKits = 0;
+      furnitureKits = 0;
       fireBuilt = false;
       firePower = 0;
       fireLevel = 0;
@@ -703,10 +704,10 @@
 
       let crafted = false;
       if (slot === '1' && spend(TABLE_RECIPES.wall)) {
-        wallList.push({ x: player.x, y: player.y, r: 18, hp: 70, maxHp: 70 });
+        wallKits += 1;
         crafted = true;
       } else if (slot === '2' && spend(TABLE_RECIPES.furniture)) {
-        furnitureList.push({ x: player.x, y: player.y, r: 15, type: Math.random() > 0.5 ? 'chair' : 'table' });
+        furnitureKits += 1;
         crafted = true;
       } else if (slot === '3' && spend(TABLE_RECIPES.barricade)) {
         wallList.push({ x: player.x, y: player.y, r: 22, hp: 130, maxHp: 130 });
@@ -729,14 +730,20 @@
       return dist(player.x, player.y, craftStation.x, craftStation.y) <= craftStation.r + 28;
     }
 
-    function placeCraftTable() {
-      if (!hasCraftTable) return;
-      const placementRadius = Math.max(currentFireRadius(), BASE_FIRE_RADIUS);
-      const inCampRange = dist(player.x, player.y, camp.x, camp.y) <= placementRadius;
-      if (!inCampRange) return;
-      craftStation.x = clamp(player.x + 24, 30, WORLD_W - 30);
-      craftStation.y = clamp(player.y + 24, 30, WORLD_H - 30);
+    function placeWallKit() {
+      if (wallKits <= 0) return;
+      wallKits -= 1;
+      wallList.push({ x: player.x, y: player.y, r: 18, hp: 70, maxHp: 70 });
       sfxBuild();
+      updateHud();
+    }
+
+    function placeFurnitureKit() {
+      if (furnitureKits <= 0) return;
+      furnitureKits -= 1;
+      furnitureList.push({ x: player.x, y: player.y, r: 15, type: Math.random() > 0.5 ? 'chair' : 'table' });
+      sfxBuild();
+      updateHud();
     }
 
     function nearestPoiInRange() {
@@ -1601,7 +1608,8 @@
     function getHotbarItems() {
       const items = [{ name: 'Axe', active: true, count: '', action: null }];
       if (hasPickaxe) items.push({ name: 'Pickaxe', active: true, count: '', action: null });
-      if (hasCraftTable) items.push({ name: 'Craft Station', active: true, count: 'Click / V', action: 'placeStation' });
+      if (wallKits > 0) items.push({ name: 'Wall Kit', active: true, count: wallKits, action: 'placeWall' });
+      if (furnitureKits > 0) items.push({ name: 'Furniture', active: true, count: furnitureKits, action: 'placeFurniture' });
       return items;
     }
 
@@ -1965,7 +1973,6 @@
       if (k === 'q') craftTrap();
       if (k === 't') igniteTorch();
       if (k === 'x') consumeFood();
-      if (k === 'v') placeCraftTable();
       if (k >= '1' && k <= '6') craftRegular(k);
       if (k === 'f') tryBuildFire(); // alias for old control
     });
@@ -1991,7 +1998,8 @@
         for (let i = 0; i < items.length; i++) {
           const x = startX + i * (slotW + gap);
           if (sx >= x && sx <= x + slotW && sy >= hotbarY && sy <= hotbarY + slotH) {
-            if (items[i].action === 'placeStation') placeCraftTable();
+            if (items[i].action === 'placeWall') placeWallKit();
+            if (items[i].action === 'placeFurniture') placeFurnitureKit();
             return;
           }
         }
