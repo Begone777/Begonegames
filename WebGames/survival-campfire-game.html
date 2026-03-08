@@ -137,7 +137,7 @@
     </div>
     <div class="hint">
       Move: <b>WASD / Arrow Keys</b> · <b>E</b> = interact (tree/rock/camp) · <b>Q</b> trap · <b>T</b> torch · <b>C</b> craft menu.<br>
-      In craft menu: <b>↑/↓</b> select and <b>E/Enter</b> craft. Wall/Furniture require standing near Craft Station.
+      In craft menu: <b>Click</b> an item to craft. Wall/Furniture require standing near Craft Station.
     </div>
     <canvas id="game" width="1240" height="760"></canvas>
     <div class="actions">
@@ -1547,8 +1547,7 @@
         { name: 'Axe', active: true, count: '' },
         { name: 'Pickaxe', active: hasPickaxe, count: hasPickaxe ? '' : 'LOCK' },
         { name: 'Torch', active: true, count: wood },
-        { name: 'Trap', active: true, count: traps },
-        { name: 'Meat', active: true, count: meat }
+        { name: 'Trap', active: true, count: traps }
       ];
 
       const totalW = items.length * slotW + (items.length - 1) * gap;
@@ -1759,7 +1758,7 @@
         '• Q: place trap (cost 3 wood + 2 stone).',
         '• T: light torch (cost 8 wood).',
         '• C: open/close craft menu.',
-        '• Crafting: press C, use ↑/↓, then Enter/E to craft.',
+        '• Crafting: press C, then click an item in the crafting panel.',
         '• Campfire: once a fire level upgrades, it keeps 20% power.',
         '• Gather extra resources at POIs: Pond/ Grove/ Ruins.'
       ];
@@ -1885,19 +1884,6 @@
       }
 
       if (craftOpen) {
-        if (k === 'arrowup' || k === 'w') {
-          craftIndex = (craftIndex - 1 + CRAFT_OPTIONS.length) % CRAFT_OPTIONS.length;
-          renderCraftPanel();
-        } else if (k === 'arrowdown' || k === 's') {
-          craftIndex = (craftIndex + 1) % CRAFT_OPTIONS.length;
-          renderCraftPanel();
-        } else if (k === 'enter' || k === 'e') {
-          craftUpgrade(CRAFT_OPTIONS[craftIndex].slot);
-        } else if (k >= '1' && k <= '8') {
-          craftIndex = Number(k) - 1;
-          craftUpgrade(k);
-          renderCraftPanel();
-        }
         return;
       }
 
@@ -1906,7 +1892,6 @@
       if (k === 'q') craftTrap();
       if (k === 't') igniteTorch();
       if (k === 'x') consumeFood();
-      if (k >= '1' && k <= '8') craftUpgrade(k);
       if (k === 'f') tryBuildFire(); // alias for old control
     });
 
@@ -1914,6 +1899,29 @@
       keys[e.key.toLowerCase()] = false;
     });
 
+    canvas.addEventListener('mousedown', (e) => {
+      if (!gameStarted || !craftOpen || gameOver) return;
+      const rect = canvas.getBoundingClientRect();
+      const sx = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const sy = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+      const panelX = W - 380;
+      const panelY = 20;
+      const panelW = 360;
+      const panelH = 270;
+      if (sx < panelX || sx > panelX + panelW || sy < panelY || sy > panelY + panelH) return;
+
+      for (let idx = 0; idx < CRAFT_OPTIONS.length; idx++) {
+        const rowY = panelY + 48 + idx * 25;
+        const rowTop = rowY - 15;
+        const rowBottom = rowTop + 20;
+        if (sy >= rowTop && sy <= rowBottom) {
+          craftIndex = idx;
+          craftUpgrade(CRAFT_OPTIONS[idx].slot);
+          return;
+        }
+      }
+    });
 
     restartBtn.addEventListener('click', () => {
       initAudio();
