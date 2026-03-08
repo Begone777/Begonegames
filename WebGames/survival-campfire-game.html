@@ -440,13 +440,34 @@
       return arr;
     }
 
+    const ANIMAL_TYPES = [
+      { kind: 'rabbit', r: 8, speed: 0.7, bodyA: '#ddd9cf', bodyB: '#bfb8aa', head: '#a49a88', meat: [1, 1], hideChance: 0.15 },
+      { kind: 'fox', r: 9, speed: 0.85, bodyA: '#df8a48', bodyB: '#a95b2f', head: '#7f3f23', meat: [1, 2], hideChance: 0.35 },
+      { kind: 'deer', r: 11, speed: 0.45, bodyA: '#c89b71', bodyB: '#9a6e49', head: '#7b5237', meat: [2, 3], hideChance: 0.55 },
+      { kind: 'boar', r: 12, speed: 0.4, bodyA: '#7d7068', bodyB: '#5a4d47', head: '#433a36', meat: [2, 4], hideChance: 0.65 },
+      { kind: 'wolf', r: 10, speed: 0.75, bodyA: '#9aa5b7', bodyB: '#6a7486', head: '#505969', meat: [2, 3], hideChance: 0.5 }
+    ];
+
+    function randomAnimalType() {
+      return ANIMAL_TYPES[Math.floor(Math.random() * ANIMAL_TYPES.length)];
+    }
+
     function spawnAnimals(n) {
       const arr = [];
       for (let i = 0; i < n; i++) {
+        const type = randomAnimalType();
         arr.push({
           x: 80 + Math.random() * (WORLD_W - 160),
           y: 80 + Math.random() * (WORLD_H - 160),
-          r: 11,
+          kind: type.kind,
+          colorA: type.bodyA,
+          colorB: type.bodyB,
+          headColor: type.head,
+          speed: type.speed,
+          meatMin: type.meat[0],
+          meatMax: type.meat[1],
+          hideChance: type.hideChance,
+          r: type.r,
           dir: Math.random() * Math.PI * 2,
           stepTimer: 30 + Math.random() * 80
         });
@@ -541,8 +562,9 @@
     function huntAnimal() {
       const a = nearestAnimalInRange();
       if (!a) return false;
-      meat += 2;
-      hide += Math.random() < 0.55 ? 1 : 0;
+      const gainedMeat = a.meatMin + Math.floor(Math.random() * (a.meatMax - a.meatMin + 1));
+      meat += gainedMeat;
+      hide += Math.random() < a.hideChance ? 1 : 0;
       animals = animals.filter(x => x !== a);
       animals.push(...spawnAnimals(1));
       sfxChop();
@@ -746,10 +768,8 @@
     }
 
     function updatePlayer() {
-      const carryWeight = wood + stones + (ore * 2) + (hide * 2) + rope + cloth + meat;
-      const weightPenalty = Math.min(0.95, carryWeight * 0.0085);
       const energyBonus = (energy / 100) * 0.75;
-      player.speed = Math.max(1.25, player.baseSpeed + energyBonus - weightPenalty);
+      player.speed = Math.max(1.25, player.baseSpeed + energyBonus);
 
       let dx = 0, dy = 0;
       if (keys['w'] || keys['arrowup']) dy -= 1;
@@ -923,8 +943,8 @@
           a.dir += (Math.random() - 0.5) * 1.6;
           a.stepTimer = 30 + Math.random() * 80;
         }
-        a.x += Math.cos(a.dir) * 0.45;
-        a.y += Math.sin(a.dir) * 0.45;
+        a.x += Math.cos(a.dir) * a.speed;
+        a.y += Math.sin(a.dir) * a.speed;
         a.x = clamp(a.x, 30, WORLD_W - 30);
         a.y = clamp(a.y, 30, WORLD_H - 30);
       }
@@ -1123,25 +1143,47 @@
         ctx.scale(breath, breath);
 
         const body = ctx.createLinearGradient(-12, -6, 12, 6);
-        body.addColorStop(0, '#c89b71');
-        body.addColorStop(1, '#9a6e49');
+        body.addColorStop(0, a.colorA);
+        body.addColorStop(1, a.colorB);
         ctx.fillStyle = body;
         ctx.beginPath();
-        ctx.ellipse(0, 0, 12, 9, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, a.r + 1, Math.max(6, a.r - 2), 0, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = '#7b5237';
-        ctx.beginPath(); ctx.arc(8, -1, 5.4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = a.headColor;
+        ctx.beginPath(); ctx.arc(a.r - 3, -1, Math.max(4, a.r * 0.45), 0, Math.PI * 2); ctx.fill();
 
         ctx.fillStyle = '#5f3d2a';
         ctx.fillRect(-6, 6, 2.8, 5);
         ctx.fillRect(-1.5, 6, 2.8, 5);
         ctx.fillRect(3, 6, 2.8, 5);
 
+        if (a.kind === 'rabbit' || a.kind === 'fox') {
+          ctx.fillStyle = a.headColor;
+          ctx.fillRect(a.r - 6, -10, 2.5, 6);
+          ctx.fillRect(a.r - 1, -10, 2.5, 6);
+        } else if (a.kind === 'deer' || a.kind === 'wolf') {
+          ctx.strokeStyle = '#d8d2c7';
+          ctx.lineWidth = 1.3;
+          ctx.beginPath();
+          ctx.moveTo(a.r - 4, -8);
+          ctx.lineTo(a.r - 7, -13);
+          ctx.moveTo(a.r, -8);
+          ctx.lineTo(a.r + 3, -13);
+          ctx.stroke();
+        } else if (a.kind === 'boar') {
+          ctx.strokeStyle = '#e9d8c2';
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.moveTo(a.r + 1, 2);
+          ctx.lineTo(a.r + 6, 5);
+          ctx.stroke();
+        }
+
         ctx.fillStyle = '#111';
-        ctx.beginPath(); ctx.arc(9.6, -2.2, 1.1, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(a.r - 1.6, -2.2, 1.1, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#f7d3bb';
-        ctx.beginPath(); ctx.arc(12, 0.8, 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(a.r + 1.2, 0.8, 1.5, 0, Math.PI * 2); ctx.fill();
 
         ctx.restore();
       }
@@ -1497,6 +1539,40 @@
       ctx.fillText(`Energy ${Math.round(energy)}% · Eat meat (X) for speed`, x, y - 6);
     }
 
+    function drawHotbar() {
+      const slotW = 88;
+      const slotH = 56;
+      const gap = 10;
+      const items = [
+        { name: 'Axe', active: true, count: '' },
+        { name: 'Pickaxe', active: hasPickaxe, count: hasPickaxe ? '' : 'LOCK' },
+        { name: 'Torch', active: true, count: wood },
+        { name: 'Trap', active: true, count: traps },
+        { name: 'Meat', active: true, count: meat }
+      ];
+
+      const totalW = items.length * slotW + (items.length - 1) * gap;
+      const startX = Math.round((W - totalW) / 2);
+      const y = H - 84;
+
+      items.forEach((it, i) => {
+        const x = startX + i * (slotW + gap);
+        ctx.fillStyle = it.active ? 'rgba(13,22,43,.92)' : 'rgba(25,25,25,.86)';
+        ctx.fillRect(x, y, slotW, slotH);
+        ctx.strokeStyle = i === 0 ? '#ffcf7a' : '#6d92ff';
+        ctx.lineWidth = i === 0 ? 2.5 : 2;
+        ctx.strokeRect(x, y, slotW, slotH);
+
+        ctx.fillStyle = it.active ? '#e6efff' : '#999';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText(it.name, x + 8, y + 18);
+
+        ctx.fillStyle = '#bcd0ff';
+        ctx.font = '12px sans-serif';
+        if (it.count !== '') ctx.fillText(String(it.count), x + 8, y + 38);
+      });
+    }
+
     function drawCraftPanelCanvas() {
       if (!craftOpen) return;
       const x = W - 380, y = 20, w = 360, h = 270;
@@ -1602,11 +1678,10 @@
 
       const usedSlots = [wood, stones, fiber, ore, cloth, water, meat, herbs, hide, rope, traps].filter(v => v > 0).length + (hasPickaxe ? 1 : 0);
       const capacity = 22 + upgradesCount;
-      const weight = wood + stones + (ore * 2) + (hide * 2) + rope + cloth + meat;
 
       ctx.font = '12px sans-serif';
       ctx.fillStyle = '#9ed0ff';
-      ctx.fillText(`Slots: ${usedSlots}/${capacity}   Weight: ${weight}`, x + 10, y + 38);
+      ctx.fillText(`Slots: ${usedSlots}/${capacity}`, x + 10, y + 38);
 
       ctx.font = '13px sans-serif';
       ctx.fillStyle = '#fff';
@@ -1781,6 +1856,7 @@
       drawWarnings();
       drawFirePowerBar();
       drawEnergyBar();
+      drawHotbar();
       drawCraftPanelCanvas();
       drawRulebook();
       drawJumpscare();
