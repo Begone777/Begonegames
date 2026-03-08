@@ -136,7 +136,7 @@
       <div class="chip">Nights Survived: <span id="score">0</span></div>
     </div>
     <div class="hint">
-      Move: <b>WASD / Arrow Keys</b> · <b>E</b> interact · <b>Q</b> trap · <b>T</b> torch · <b>V</b> place crafting table · <b>C</b> craft menu.<br>
+      Move: <b>WASD / Arrow Keys</b> · <b>E</b> interact · <b>Q</b> trap · <b>T</b> torch · <b>V</b> place crafting station · <b>C</b> craft menu · <b>I</b> inventory.<br>
       In craft menu: <b>Click</b> an item to craft. Wall/Furniture require standing near Craft Station.
     </div>
     <canvas id="game" width="1240" height="760"></canvas>
@@ -150,7 +150,7 @@
   <div id="startOverlay" class="start-overlay">
     <div class="start-card">
       <h2>Campfire Survival</h2>
-      <p>Keyboard controls: WASD/Arrows move · E interact · C craft · R rulebook.</p>
+      <p>Keyboard controls: WASD/Arrows move · E interact · C craft · I inventory · R rulebook.</p>
       <div class="start-actions">
         <button id="startPcBtn">Start</button>
       </div>
@@ -203,6 +203,7 @@
     let craftOpen = false;
     let craftIndex = 0;
     let rulebookOpen = false;
+    let inventoryOpen = false;
     let camX = 0;
     let camY = 0;
     let joyDx = 0;
@@ -403,6 +404,7 @@
       craftOpen = false;
       craftIndex = 0;
       rulebookOpen = false;
+      inventoryOpen = false;
       renderCraftPanel();
       updateHud();
       startAmbient();
@@ -1589,7 +1591,7 @@
       const gap = 10;
       const items = [{ name: 'Axe', active: true, count: '' }];
       if (hasPickaxe) items.push({ name: 'Pickaxe', active: true, count: '' });
-      if (hasCraftTable) items.push({ name: 'Craft Table', active: true, count: 'V Place' });
+      if (hasCraftTable) items.push({ name: 'Craft Station', active: true, count: 'V Place' });
 
       const totalW = items.length * slotW + (items.length - 1) * gap;
       const startX = Math.round((W - totalW) / 2);
@@ -1625,7 +1627,7 @@
       ctx.strokeRect(x, y, w, h);
       ctx.fillStyle = '#d6e5ff';
       ctx.font = 'bold 24px sans-serif';
-      ctx.fillText('Crafting Table (click an item to craft)', x + 18, y + 34);
+      ctx.fillText('Crafting Station (click an item to craft)', x + 18, y + 34);
 
       ctx.font = '18px sans-serif';
       TABLE_CRAFT_OPTIONS.forEach((opt, idx) => {
@@ -1709,6 +1711,7 @@
     }
 
     function drawInventory() {
+      if (!inventoryOpen) return;
       const x = W - 352, y = H - 278, w = 332, h = 258;
       ctx.fillStyle = 'rgba(8,14,28,.9)';
       ctx.fillRect(x, y, w, h);
@@ -1717,7 +1720,7 @@
       ctx.strokeRect(x, y, w, h);
       ctx.fillStyle = '#d6e5ff';
       ctx.font = 'bold 14px sans-serif';
-      ctx.fillText('Inventory+', x + 10, y + 20);
+      ctx.fillText('Inventory', x + 10, y + 20);
 
       const usedSlots = [wood, stones, fiber, ore, cloth, water, meat, herbs, hide, rope, traps].filter(v => v > 0).length + (hasPickaxe ? 1 : 0);
       const capacity = 22 + upgradesCount;
@@ -1803,7 +1806,7 @@
         '• T: light torch (cost 8 wood).',
         '• C: open/close craft menu.',
         '• Regular crafting: keys 1-6 for personal upgrades (not in table panel).',
-        '• Crafting table: press C near the table, then click item to craft.',
+        '• Crafting station: press C near the station, then click item to craft.',
         '• Campfire: once a fire level upgrades, it keeps 20% power.',
         '• Gather extra resources at POIs: Pond/ Grove/ Ruins.'
       ];
@@ -1915,6 +1918,11 @@
 
       if (k === 'r') {
         rulebookOpen = !rulebookOpen;
+        return;
+      }
+
+      if (k === 'i') {
+        inventoryOpen = !inventoryOpen;
         return;
       }
 
