@@ -99,51 +99,6 @@
     }
     #restartBtn { background: #364066; }
     .ios-device #fullscreenBtn { opacity: .55; }
-    .mobile-controls {
-      position: fixed;
-      left: 12px;
-      bottom: 12px;
-      display: none;
-      flex-direction: column-reverse;
-      align-items: flex-start;
-      gap: 10px;
-      z-index: 5;
-    }
-    .device-mobile .mobile-controls { display: flex; }
-    .joystick {
-      width: 140px;
-      height: 140px;
-      border-radius: 999px;
-      border: 2px solid #5d7bd4;
-      background: radial-gradient(circle at 30% 25%, #2b3e74, #1a2649);
-      position: relative;
-      touch-action: none;
-      user-select: none;
-    }
-    .joy-knob {
-      position: absolute;
-      width: 56px;
-      height: 56px;
-      left: 42px;
-      top: 42px;
-      border-radius: 999px;
-      background: #8fb1ff;
-      border: 2px solid #d9e5ff;
-      box-shadow: 0 4px 12px rgba(0,0,0,.35);
-      pointer-events: none;
-    }
-    .mobile-actions {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(92px, 1fr));
-      gap: 8px;
-      width: min(250px, 66vw);
-      justify-items: stretch;
-    }
-    .mobile-actions button {
-      min-height: 44px;
-      font-size: 12px;
-      background: #2d3f76;
-    }
     .start-overlay {
       position: fixed;
       inset: 0;
@@ -181,7 +136,7 @@
       <div class="chip">Nights Survived: <span id="score">0</span></div>
     </div>
     <div class="hint">
-      Move: <b>WASD / Arrow Keys</b> (or mobile joystick) · <b>E</b> = interact (tree/rock/camp) · <b>Q</b> trap · <b>T</b> torch · <b>C</b> craft menu.<br>
+      Move: <b>WASD / Arrow Keys</b> · <b>E</b> = interact (tree/rock/camp) · <b>Q</b> trap · <b>T</b> torch · <b>C</b> craft menu.<br>
       In craft menu: <b>↑/↓</b> select and <b>E/Enter</b> craft. Wall/Furniture require standing near Craft Station.
     </div>
     <canvas id="game" width="1240" height="760"></canvas>
@@ -189,33 +144,15 @@
       <button id="restartBtn">Restart</button>
       <button id="fullscreenBtn">Fullscreen</button>
     </div>
-    <div class="mobile-controls">
-      <div id="joystick" class="joystick">
-        <div id="joyKnob" class="joy-knob"></div>
-      </div>
-      <div class="mobile-actions">
-        <button data-key="e">Interact</button>
-        <button data-key="fuel">Fuel Fire</button>
-        <button data-key="q">Place Trap</button>
-        <button data-key="t">Light Torch</button>
-        <button data-key="c">Craft Menu</button>
-        <button data-key="craft-up">Craft ▲</button>
-        <button data-key="craft-down">Craft ▼</button>
-        <button data-key="craft-make">Craft Item</button>
-        <button data-key="eat">Eat Food</button>
-        <button data-key="rulebook">Rulebook</button>
-      </div>
-    </div>
     <!-- craft panel now rendered on canvas -->
   </div>
 
   <div id="startOverlay" class="start-overlay">
     <div class="start-card">
-      <h2>Choose your device</h2>
-      <p>Pick your control style to start the game.</p>
+      <h2>Campfire Survival</h2>
+      <p>Keyboard controls: WASD/Arrows move · E interact · C craft · R rulebook.</p>
       <div class="start-actions">
-        <button id="startPcBtn">PC</button>
-        <button id="startMobileBtn">Mobile</button>
+        <button id="startPcBtn">Start</button>
       </div>
     </div>
   </div>
@@ -238,14 +175,9 @@
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     const startOverlay = document.getElementById('startOverlay');
     const startPcBtn = document.getElementById('startPcBtn');
-    const startMobileBtn = document.getElementById('startMobileBtn');
-    const joystickEl = document.getElementById('joystick');
-    const joyKnobEl = document.getElementById('joyKnob');
 
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const isTouchDevice = navigator.maxTouchPoints > 0;
-    const isProbablyMobile = /Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || isIOS;
 
     const W = canvas.width;
     const H = canvas.height;
@@ -273,7 +205,6 @@
     let camY = 0;
     let joyDx = 0;
     let joyDy = 0;
-    let joyActive = false;
 
     const DAY_MS = 22000;
     const NIGHT_MS = 30000;
@@ -458,7 +389,6 @@
       craftOpen = false;
       craftIndex = 0;
       rulebookOpen = false;
-      if (typeof resetJoystick === 'function') resetJoystick();
       renderCraftPanel();
       updateHud();
       startAmbient();
@@ -1564,7 +1494,7 @@
       ctx.strokeRect(x, y, w, h);
       ctx.fillStyle = '#eafff3';
       ctx.font = '12px sans-serif';
-      ctx.fillText(`Energy ${Math.round(energy)}% · Eat meat (X/mobile) for speed`, x, y - 6);
+      ctx.fillText(`Energy ${Math.round(energy)}% · Eat meat (X) for speed`, x, y - 6);
     }
 
     function drawCraftPanelCanvas() {
@@ -1706,10 +1636,8 @@
       ctx.fillText(`Torch: ${torchTimerMs > 0 ? 'Lit' : 'Off'}`, x + 10, y + h - 14);
       ctx.fillStyle = '#c5d7ff';
       ctx.fillText('POI Gather: E near Pond/Grove/Ruins', x + 132, y + h - 30);
-      if (!document.body.classList.contains('device-mobile')) {
-        ctx.fillStyle = '#ffe59b';
-        ctx.fillText('PC Tip: Press R for Rulebook · Press X to eat meat', x + 132, y + h - 14);
-      }
+      ctx.fillStyle = '#ffe59b';
+      ctx.fillText('Tip: Press R for Rulebook · Press X to eat meat', x + 132, y + h - 14);
     }
 
     function drawWarnings() {
@@ -1750,13 +1678,13 @@
 
       const lines = [
         '• Goal: survive nights, upgrade campfire, and outlast the monster.',
-        '• Movement: WASD/Arrows or mobile joystick.',
+        '• Movement: WASD/Arrow keys.',
         '• E: Interact (campfire, gather, chop/mine, open chests).',
         '• R: toggle this Rulebook on PC.',
         '• Q: place trap (cost 3 wood + 2 stone).',
         '• T: light torch (cost 8 wood).',
         '• C: open/close craft menu.',
-        '• Crafting: 1-8 quick craft on PC, or C + ▲/▼ + Craft on mobile.',
+        '• Crafting: press C, use ↑/↓, then Enter/E to craft.',
         '• Campfire: once a fire level upgrades, it keeps 20% power.',
         '• Gather extra resources at POIs: Pond/ Grove/ Ruins.'
       ];
@@ -1765,7 +1693,7 @@
 
       ctx.fillStyle = '#ffe59b';
       ctx.font = 'bold 16px sans-serif';
-      ctx.fillText('Press R (PC) or Rulebook button (mobile) to close', x + 24, y + h - 24);
+      ctx.fillText('Press R to close', x + 24, y + h - 24);
     }
 
     function drawJumpscare() {
@@ -1863,7 +1791,6 @@
 
     window.addEventListener('keydown', (e) => {
       if (!gameStarted) return;
-      if (document.body.classList.contains('device-mobile')) return;
       const k = e.key.toLowerCase();
 
       if (k === 'r') {
@@ -1908,94 +1835,9 @@
     });
 
     window.addEventListener('keyup', (e) => {
-      if (document.body.classList.contains('device-mobile')) return;
       keys[e.key.toLowerCase()] = false;
     });
 
-    document.querySelectorAll('.mobile-actions button').forEach((btn) => {
-      const key = btn.dataset.key;
-      const press = (ev) => {
-        ev.preventDefault();
-        if (!gameStarted) return;
-        initAudio();
-
-        if (key === 'rulebook') {
-          rulebookOpen = !rulebookOpen;
-          return;
-        }
-
-        if (rulebookOpen) {
-          if (key === 'e') rulebookOpen = false;
-          return;
-        }
-
-        if (key === 'e') interact();
-        if (key === 'fuel') tryBuildFire();
-        if (key === 'q') craftTrap();
-        if (key === 't') igniteTorch();
-        if (key === 'eat') consumeFood();
-        if (key === 'c') { craftOpen = !craftOpen; renderCraftPanel(); }
-
-        if (key === 'craft-up' && craftOpen) {
-          craftIndex = (craftIndex - 1 + CRAFT_OPTIONS.length) % CRAFT_OPTIONS.length;
-          renderCraftPanel();
-        }
-        if (key === 'craft-down' && craftOpen) {
-          craftIndex = (craftIndex + 1) % CRAFT_OPTIONS.length;
-          renderCraftPanel();
-        }
-        if (key === 'craft-make' && craftOpen) {
-          craftUpgrade(CRAFT_OPTIONS[craftIndex].slot);
-        }
-      };
-      btn.addEventListener('touchstart', press, { passive: false });
-      btn.addEventListener('mousedown', press);
-    });
-
-    function setJoystickFromEvent(ev) {
-      const touch = ev.touches ? ev.touches[0] : ev;
-      const rect = joystickEl.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      let dx = touch.clientX - cx;
-      let dy = touch.clientY - cy;
-      const maxR = rect.width * 0.34;
-      const len = Math.hypot(dx, dy) || 1;
-      if (len > maxR) { dx = (dx / len) * maxR; dy = (dy / len) * maxR; }
-      joyDx = dx / maxR;
-      joyDy = dy / maxR;
-      joyKnobEl.style.left = `${42 + dx}px`;
-      joyKnobEl.style.top = `${42 + dy}px`;
-    }
-
-    function resetJoystick() {
-      joyDx = 0; joyDy = 0; joyActive = false;
-      joyKnobEl.style.left = '42px';
-      joyKnobEl.style.top = '42px';
-    }
-
-    joystickEl.addEventListener('touchstart', (ev) => {
-      ev.preventDefault();
-      if (!gameStarted) return;
-      initAudio();
-      joyActive = true;
-      setJoystickFromEvent(ev);
-    }, { passive: false });
-    joystickEl.addEventListener('touchmove', (ev) => {
-      ev.preventDefault();
-      if (!joyActive) return;
-      setJoystickFromEvent(ev);
-    }, { passive: false });
-    joystickEl.addEventListener('touchend', (ev) => { ev.preventDefault(); resetJoystick(); }, { passive: false });
-
-    joystickEl.addEventListener('mousedown', (ev) => {
-      if (!gameStarted) return;
-      initAudio();
-      joyActive = true;
-      setJoystickFromEvent(ev);
-    });
-    window.addEventListener('mousemove', (ev) => { if (joyActive) setJoystickFromEvent(ev); });
-    window.addEventListener('mouseup', () => { if (joyActive) resetJoystick(); });
 
     restartBtn.addEventListener('click', () => {
       initAudio();
@@ -2004,8 +1846,6 @@
 
     if (isIOS) {
       document.body.classList.add('ios-device');
-      startMobileBtn.textContent = 'iPhone / iPad';
-      startPcBtn.textContent = 'PC (Keyboard)';
       fullscreenBtn.textContent = 'iOS: Use Add to Home Screen';
     }
 
@@ -2025,30 +1865,16 @@
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
 
-    if (isTouchDevice) {
-      window.addEventListener('touchmove', (e) => {
-        if (gameStarted && document.body.classList.contains('device-mobile')) e.preventDefault();
-      }, { passive: false });
-      window.addEventListener('gesturestart', (e) => e.preventDefault());
-      window.addEventListener('gesturechange', (e) => e.preventDefault());
-    }
-
-    function startGame(device) {
+    function startGame() {
       if (gameStarted) return;
       gameStarted = true;
-      document.body.classList.toggle('device-mobile', device === 'mobile');
       startOverlay.style.display = 'none';
       initAudio();
       reset();
       tick();
     }
 
-    startPcBtn.addEventListener('click', () => startGame('pc'));
-    startMobileBtn.addEventListener('click', () => startGame('mobile'));
-
-    if (isProbablyMobile) {
-      startGame('mobile');
-    }
+    startPcBtn.addEventListener('click', startGame);
   </script>
 </body>
 </html>
