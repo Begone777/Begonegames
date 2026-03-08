@@ -252,6 +252,15 @@
       { slot: '4', key: 'firecore', name: 'Fire Core', desc: 'Fire burns longer' }
     ];
 
+    const REGULAR_CRAFT_OPTIONS = [
+      { slot: '1', key: 'pickaxe', name: 'Pickaxe', desc: 'Unlock mining', cost: () => REGULAR_RECIPES.pickaxe },
+      { slot: '2', key: 'boots', name: 'Boots', desc: '+Speed (2 levels)', cost: () => bootsLevel === 0 ? REGULAR_RECIPES.boots1 : REGULAR_RECIPES.boots2 },
+      { slot: '3', key: 'jacket', name: 'Jacket', desc: '+Max HP (2 levels)', cost: () => jacketLevel === 0 ? REGULAR_RECIPES.jacket1 : REGULAR_RECIPES.jacket2 },
+      { slot: '4', key: 'axe', name: 'Axe+', desc: '+Tree damage (2 levels)', cost: () => axeLevel === 0 ? REGULAR_RECIPES.axe1 : REGULAR_RECIPES.axe2 },
+      { slot: '5', key: 'lantern', name: 'Lantern', desc: '+Torch power (2 levels)', cost: () => lanternLevel === 0 ? REGULAR_RECIPES.lantern1 : REGULAR_RECIPES.lantern2 },
+      { slot: '6', key: 'trapper', name: 'Trap+', desc: '+Trap slow (2 levels)', cost: () => trapperLevel === 0 ? REGULAR_RECIPES.trapper1 : REGULAR_RECIPES.trapper2 }
+    ];
+
     // --- audio ---
     let audioCtx = null;
     let ambTimer = null;
@@ -716,9 +725,14 @@
       }
     }
 
+    function isNearCraftStation() {
+      return dist(player.x, player.y, craftStation.x, craftStation.y) <= craftStation.r + 28;
+    }
+
     function placeCraftTable() {
       if (!hasCraftTable) return;
-      const inCampRange = dist(player.x, player.y, camp.x, camp.y) <= currentFireRadius();
+      const placementRadius = Math.max(currentFireRadius(), BASE_FIRE_RADIUS);
+      const inCampRange = dist(player.x, player.y, camp.x, camp.y) <= placementRadius;
       if (!inCampRange) return;
       craftStation.x = clamp(player.x + 24, 30, WORLD_W - 30);
       craftStation.y = clamp(player.y + 24, 30, WORLD_H - 30);
@@ -736,12 +750,11 @@
 
     function interact() {
       const dCamp = dist(player.x, player.y, camp.x, camp.y);
-      const dStation = dist(player.x, player.y, craftStation.x, craftStation.y);
       if (dCamp <= camp.r + 22) {
         tryBuildFire();
         return;
       }
-      if (dStation <= craftStation.r + 28) {
+      if (isNearCraftStation()) {
         craftOpen = true;
         renderCraftPanel();
         return;
@@ -1585,13 +1598,18 @@
       ctx.fillText(`Energy ${Math.round(energy)}% · Eat meat (X) for speed`, x, y - 6);
     }
 
+    function getHotbarItems() {
+      const items = [{ name: 'Axe', active: true, count: '', action: null }];
+      if (hasPickaxe) items.push({ name: 'Pickaxe', active: true, count: '', action: null });
+      if (hasCraftTable) items.push({ name: 'Craft Station', active: true, count: 'Click / V', action: 'placeStation' });
+      return items;
+    }
+
     function drawHotbar() {
       const slotW = 102;
       const slotH = 58;
       const gap = 10;
-      const items = [{ name: 'Axe', active: true, count: '' }];
-      if (hasPickaxe) items.push({ name: 'Pickaxe', active: true, count: '' });
-      if (hasCraftTable) items.push({ name: 'Craft Station', active: true, count: 'V Place' });
+      const items = getHotbarItems();
 
       const totalW = items.length * slotW + (items.length - 1) * gap;
       const startX = Math.round((W - totalW) / 2);
@@ -1617,6 +1635,7 @@
 
     function drawCraftPanelCanvas() {
       if (!craftOpen) return;
+      const nearStation = isNearCraftStation();
       const w = 620, h = 430;
       const x = Math.round((W - w) / 2);
       const y = Math.round((H - h) / 2);
@@ -1627,22 +1646,23 @@
       ctx.strokeRect(x, y, w, h);
       ctx.fillStyle = '#d6e5ff';
       ctx.font = 'bold 24px sans-serif';
-      ctx.fillText('Crafting Station (click an item to craft)', x + 18, y + 34);
+      ctx.fillText(nearStation ? 'Crafting Station (click an item to craft)' : 'Regular Crafting (click an item to craft)', x + 18, y + 34);
 
+      const options = nearStation ? TABLE_CRAFT_OPTIONS : REGULAR_CRAFT_OPTIONS;
       ctx.font = '18px sans-serif';
-      TABLE_CRAFT_OPTIONS.forEach((opt, idx) => {
-        const c = TABLE_RECIPES[opt.key];
-        const rowY = y + 84 + idx * 78;
+      options.forEach((opt, idx) => {
+        const c = nearStation ? TABLE_RECIPES[opt.key] : opt.cost();
         const affordable = wood >= c.wood && stones >= c.stone;
+        const rowY = y + 84 + idx * 58;
 
         ctx.fillStyle = idx === craftIndex ? 'rgba(255,229,155,.16)' : 'rgba(255,255,255,.04)';
-        ctx.fillRect(x + 14, rowY - 34, w - 28, 64);
+        ctx.fillRect(x + 14, rowY - 28, w - 28, 48);
 
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(opt.name, x + 26, rowY - 6);
+        ctx.fillText(opt.name, x + 26, rowY - 4);
         ctx.fillStyle = '#b6cfff';
         ctx.font = '15px sans-serif';
-        ctx.fillText(opt.desc, x + 26, rowY + 16);
+        ctx.fillText(opt.desc, x + 26, rowY + 14);
         ctx.font = '18px sans-serif';
         ctx.fillStyle = affordable ? '#99f3b1' : '#ffb3b3';
         ctx.fillText(`${c.wood}W / ${c.stone}S`, x + w - 170, rowY + 6);
@@ -1955,24 +1975,45 @@
     });
 
     canvas.addEventListener('mousedown', (e) => {
-      if (!gameStarted || !craftOpen || gameOver) return;
+      if (!gameStarted || gameOver) return;
       const rect = canvas.getBoundingClientRect();
       const sx = (e.clientX - rect.left) * (canvas.width / rect.width);
       const sy = (e.clientY - rect.top) * (canvas.height / rect.height);
 
+      if (!craftOpen) {
+        const slotW = 102;
+        const slotH = 58;
+        const gap = 10;
+        const items = getHotbarItems();
+        const totalW = items.length * slotW + (items.length - 1) * gap;
+        const startX = Math.round((W - totalW) / 2);
+        const hotbarY = H - 86;
+        for (let i = 0; i < items.length; i++) {
+          const x = startX + i * (slotW + gap);
+          if (sx >= x && sx <= x + slotW && sy >= hotbarY && sy <= hotbarY + slotH) {
+            if (items[i].action === 'placeStation') placeCraftTable();
+            return;
+          }
+        }
+        return;
+      }
+
+      const nearStation = isNearCraftStation();
+      const options = nearStation ? TABLE_CRAFT_OPTIONS : REGULAR_CRAFT_OPTIONS;
       const panelW = 620;
       const panelH = 430;
       const panelX = Math.round((W - panelW) / 2);
       const panelY = Math.round((H - panelH) / 2);
       if (sx < panelX || sx > panelX + panelW || sy < panelY || sy > panelY + panelH) return;
 
-      for (let idx = 0; idx < TABLE_CRAFT_OPTIONS.length; idx++) {
-        const rowY = panelY + 84 + idx * 78;
-        const rowTop = rowY - 34;
-        const rowBottom = rowTop + 64;
+      for (let idx = 0; idx < options.length; idx++) {
+        const rowY = panelY + 84 + idx * 58;
+        const rowTop = rowY - 28;
+        const rowBottom = rowTop + 48;
         if (sy >= rowTop && sy <= rowBottom) {
           craftIndex = idx;
-          craftUpgrade(TABLE_CRAFT_OPTIONS[idx].slot);
+          if (nearStation) craftUpgrade(options[idx].slot);
+          else craftRegular(options[idx].slot);
           return;
         }
       }
