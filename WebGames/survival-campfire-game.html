@@ -888,12 +888,12 @@
       const dCamp = dist(player.x, player.y, camp.x, camp.y);
       if (dCamp <= camp.r + 22) {
         tryBuildFire();
-        return;
+        return true;
       }
       if (isNearCraftStation()) {
         craftOpen = true;
         renderCraftPanel();
-        return;
+        return true;
       }
       const poi = nearestPoiInRange();
       if (poi) {
@@ -908,11 +908,12 @@
           if (Math.random() < 0.25) hide += 1;
         }
         updateHud();
-        return;
+        return true;
       }
-      if (gatherPlant()) return;
-      if (openChest()) return;
-      if (huntAnimal()) return;
+      if (gatherPlant()) return true;
+      if (openChest()) return true;
+      if (huntAnimal()) return true;
+      return false;
     }
 
     function tryBuildFire() {
@@ -2147,7 +2148,7 @@
       }
 
       keys[k] = true;
-      if (k === 'e') interact();
+      if (k === 'e') { if (!interact()) useSelectedHotbarItem(); }
       if (k === 'q') craftTrap();
       if (k === 't') igniteTorch();
       if (k === 'x') consumeFood();
