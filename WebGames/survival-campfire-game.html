@@ -98,7 +98,6 @@
       cursor: pointer;
     }
     #restartBtn { background: #364066; }
-    .ios-device #fullscreenBtn { opacity: .55; }
     .start-overlay {
       position: fixed;
       inset: 0;
@@ -176,25 +175,22 @@
     const startOverlay = document.getElementById('startOverlay');
     const startPcBtn = document.getElementById('startPcBtn');
 
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
     const W = canvas.width;
     const H = canvas.height;
 
-    const WORLD_W = 3200;
-    const WORLD_H = 2200;
+    const WORLD_W = 5200;
+    const WORLD_H = 3600;
     const camp = { x: WORLD_W * 0.5, y: WORLD_H * 0.5, r: 28 };
     const craftStation = { x: camp.x + 90, y: camp.y + 10, r: 22 };
     const BASE_FIRE_RADIUS = 120;
     const FIRE_RADIUS_PER_LEVEL = 30;
 
-    let player, monster, trees, rocks, trapList, wallList, furnitureList, pointsOfInterest, chests, animals, keys;
+    let player, monster, trees, rocks, trapList, wallList, furnitureList, pointsOfInterest, chests, animals, plants, keys;
     let wood, stones, traps, health, maxHealth, fireBuilt, gameOver, firePower, fireLevel, torchTimerMs, energy;
-    let fiber, ore, cloth, water, meat, herbs, hide, rope;
+    let fiber, ore, cloth, water, meat, herbs, hide, rope, carrots, berries, peppers, melons;
     let hasPickaxe, axePower, minePower, torchDurationBonusMs, torchRadiusBonus, trapSlowBonus, upgradesCount;
     let bootsLevel, jacketLevel, axeLevel, lanternLevel, trapperLevel;
-    let wallKits, furnitureKits;
+    let wallKits, furnitureKits, heavyBarrierKits;
     let dayNightTimer, isNight, survivedNights, currentNightMs;
     let footstepCooldown = 0;
     let gameStarted = false;
@@ -208,6 +204,7 @@
     let camY = 0;
     let joyDx = 0;
     let joyDy = 0;
+    let sprintBoostTimerMs = 0;
 
     const DAY_MS = 22000;
     const NIGHT_MS = 30000;
@@ -241,14 +238,14 @@
     const TABLE_RECIPES = {
       wall: { wood: 5, stone: 2 },
       furniture: { wood: 4, stone: 1 },
-      barricade: { wood: 10, stone: 8 },
+      heavyBarrier: { wood: 10, stone: 8 },
       firecore: { wood: 12, stone: 12 }
     };
 
     const TABLE_CRAFT_OPTIONS = [
       { slot: '1', key: 'wall', name: 'Wall Kit', desc: 'Defensive wall' },
       { slot: '2', key: 'furniture', name: 'Furniture', desc: 'Comfort furniture' },
-      { slot: '3', key: 'barricade', name: 'Barricade', desc: 'Heavy wall' },
+      { slot: '3', key: 'heavyBarrier', name: 'Heavy Barrier Kit', desc: 'Placeable heavy wall' },
       { slot: '4', key: 'firecore', name: 'Fire Core', desc: 'Fire burns longer' }
     ];
 
@@ -353,8 +350,8 @@
     function reset() {
       player = { x: camp.x + 64, y: camp.y + 4, r: 12, baseSpeed: 2.45, speed: 2.45, angle: 0, walkPhase: 0, action: '', actionTimer: 0 };
       monster = { x: WORLD_W - 120, y: WORLD_H - 120, r: 14, speedDay: 2.0, speedNight: 2.8, slowTimer: 0 };
-      trees = spawnTrees(50);
-      rocks = spawnRocks(36);
+      trees = spawnTrees(95);
+      rocks = spawnRocks(68);
       trapList = [];
       wallList = [];
       furnitureList = [];
@@ -365,8 +362,9 @@
         { x: WORLD_W * 0.25, y: WORLD_H * 0.3, type: 'pond' },
         { x: WORLD_W * 0.72, y: WORLD_H * 0.65, type: 'ruins' }
       ];
-      chests = spawnChests(5);
-      animals = spawnAnimals(22);
+      chests = spawnChests(12);
+      animals = spawnAnimals(42);
+      plants = spawnPlants(85);
       keys = {};
       wood = 0;
       stones = 0;
@@ -378,6 +376,10 @@
       herbs = 0;
       hide = 0;
       rope = 0;
+      carrots = 0;
+      berries = 0;
+      peppers = 0;
+      melons = 0;
       traps = 0;
       energy = 70;
       maxHealth = 100;
@@ -396,6 +398,7 @@
       trapperLevel = 0;
       wallKits = 0;
       furnitureKits = 0;
+      heavyBarrierKits = 0;
       fireBuilt = false;
       firePower = 0;
       fireLevel = 0;
@@ -415,6 +418,7 @@
       craftIndex = 0;
       rulebookOpen = false;
       inventoryOpen = false;
+      sprintBoostTimerMs = 0;
       renderCraftPanel();
       updateHud();
       startAmbient();
@@ -496,6 +500,34 @@
           r: type.r,
           dir: Math.random() * Math.PI * 2,
           stepTimer: 30 + Math.random() * 80
+        });
+      }
+      return arr;
+    }
+
+    const PLANT_TYPES = [
+      { kind: 'carrot', color: '#ff8a3d', leaf: '#58bf5f', gain: 'carrots' },
+      { kind: 'berry', color: '#9446ff', leaf: '#3aa55f', gain: 'berries' },
+      { kind: 'pepper', color: '#ff3b32', leaf: '#49b16b', gain: 'peppers' },
+      { kind: 'melon', color: '#7ad16c', leaf: '#3e9857', gain: 'melons' }
+    ];
+
+    function randomPlantType() {
+      return PLANT_TYPES[Math.floor(Math.random() * PLANT_TYPES.length)];
+    }
+
+    function spawnPlants(n) {
+      const arr = [];
+      for (let i = 0; i < n; i++) {
+        const type = randomPlantType();
+        arr.push({
+          x: 70 + Math.random() * (WORLD_W - 140),
+          y: 70 + Math.random() * (WORLD_H - 140),
+          r: 14,
+          kind: type.kind,
+          color: type.color,
+          leaf: type.leaf,
+          gain: type.gain
         });
       }
       return arr;
@@ -709,8 +741,8 @@
       } else if (slot === '2' && spend(TABLE_RECIPES.furniture)) {
         furnitureKits += 1;
         crafted = true;
-      } else if (slot === '3' && spend(TABLE_RECIPES.barricade)) {
-        wallList.push({ x: player.x, y: player.y, r: 22, hp: 130, maxHp: 130 });
+      } else if (slot === '3' && spend(TABLE_RECIPES.heavyBarrier)) {
+        heavyBarrierKits += 1;
         crafted = true;
       } else if (slot === '4' && spend(TABLE_RECIPES.firecore)) {
         fireLevel = Math.min(FIRE_MAX_LEVEL, fireLevel + 1);
@@ -746,6 +778,14 @@
       updateHud();
     }
 
+    function placeHeavyBarrierKit() {
+      if (heavyBarrierKits <= 0) return;
+      heavyBarrierKits -= 1;
+      wallList.push({ x: player.x, y: player.y, r: 24, hp: 170, maxHp: 170 });
+      sfxBuild();
+      updateHud();
+    }
+
     function nearestPoiInRange() {
       let best = null, bestD = Infinity;
       for (const p of pointsOfInterest) {
@@ -754,6 +794,48 @@
       }
       return best;
     }
+    function nearestPlantInRange() {
+      let best = null, bestD = Infinity;
+      for (const pl of plants) {
+        const d = dist(player.x, player.y, pl.x, pl.y);
+        if (d < 46 && d < bestD) { best = pl; bestD = d; }
+      }
+      return best;
+    }
+
+    function gatherPlant() {
+      const pl = nearestPlantInRange();
+      if (!pl) return false;
+      if (pl.gain === 'carrots') carrots += 1;
+      if (pl.gain === 'berries') berries += 1;
+      if (pl.gain === 'peppers') peppers += 1;
+      if (pl.gain === 'melons') melons += 1;
+      plants = plants.filter(x => x !== pl);
+      plants.push(...spawnPlants(1));
+      updateHud();
+      return true;
+    }
+
+    function useHotbarFood(kind) {
+      if (kind === 'carrot' && carrots > 0) {
+        carrots -= 1;
+        energy = Math.min(100, energy + 20);
+      } else if (kind === 'berry' && berries > 0) {
+        berries -= 1;
+        health = Math.min(maxHealth, health + 12);
+      } else if (kind === 'pepper' && peppers > 0) {
+        peppers -= 1;
+        sprintBoostTimerMs = Math.max(sprintBoostTimerMs, 6000);
+      } else if (kind === 'melon' && melons > 0) {
+        melons -= 1;
+        health = Math.min(maxHealth, health + 18);
+        energy = Math.min(100, energy + 18);
+      } else {
+        return;
+      }
+      updateHud();
+    }
+
 
     function interact() {
       const dCamp = dist(player.x, player.y, camp.x, camp.y);
@@ -781,6 +863,7 @@
         updateHud();
         return;
       }
+      if (gatherPlant()) return;
       if (openChest()) return;
       if (huntAnimal()) return;
       if (nearestTreeInRange()) {
@@ -834,7 +917,8 @@
 
     function updatePlayer() {
       const energyBonus = (energy / 100) * 0.75;
-      player.speed = Math.max(1.25, player.baseSpeed + energyBonus);
+      const sprintBonus = sprintBoostTimerMs > 0 ? 0.95 : 0;
+      player.speed = Math.max(1.25, player.baseSpeed + energyBonus + sprintBonus);
 
       let dx = 0, dy = 0;
       if (keys['w'] || keys['arrowup']) dy -= 1;
@@ -1000,6 +1084,7 @@
       traps = trapList.length;
 
       monsterAttackCooldownMs = Math.max(0, monsterAttackCooldownMs - dt);
+      sprintBoostTimerMs = Math.max(0, sprintBoostTimerMs - dt);
       if (damageFlashTimer > 0) damageFlashTimer -= 1;
       energy = Math.max(0, energy - (isNight ? 0.028 : 0.018) * (dt / 16.67));
 
@@ -1252,6 +1337,19 @@
         ctx.beginPath(); ctx.arc(a.r + 1.2, 0.8, 1.5, 0, Math.PI * 2); ctx.fill();
 
         ctx.restore();
+      }
+    }
+
+    function drawPlants() {
+      for (const pl of plants) {
+        ctx.fillStyle = pl.leaf;
+        ctx.beginPath();
+        ctx.arc(pl.x, pl.y + 3, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = pl.color;
+        ctx.beginPath();
+        ctx.arc(pl.x, pl.y - 4, 6, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
 
@@ -1610,6 +1708,11 @@
       if (hasPickaxe) items.push({ name: 'Pickaxe', active: true, count: '', action: null });
       if (wallKits > 0) items.push({ name: 'Wall Kit', active: true, count: wallKits, action: 'placeWall' });
       if (furnitureKits > 0) items.push({ name: 'Furniture', active: true, count: furnitureKits, action: 'placeFurniture' });
+      if (heavyBarrierKits > 0) items.push({ name: 'Heavy Barrier', active: true, count: heavyBarrierKits, action: 'placeHeavyBarrier' });
+      if (carrots > 0) items.push({ name: 'Carrot ⚡', active: true, count: carrots, action: 'eatCarrot' });
+      if (berries > 0) items.push({ name: 'Berry ❤️', active: true, count: berries, action: 'eatBerry' });
+      if (peppers > 0) items.push({ name: 'Pepper 🏃', active: true, count: peppers, action: 'eatPepper' });
+      if (melons > 0) items.push({ name: 'Melon 💚', active: true, count: melons, action: 'eatMelon' });
       return items;
     }
 
@@ -1707,6 +1810,7 @@
       chests.forEach(c => dot(c.x, c.y, '#f1c27b', 2.4));
       trees.forEach(t => dot(t.x, t.y, '#6fe08b', 2.2));
       rocks.forEach(r => dot(r.x, r.y, '#b9c6da', 2.2));
+      plants.forEach(pl => dot(pl.x, pl.y, '#ff7f7f', 1.9));
       wallList.forEach(w => dot(w.x, w.y, '#b99468', 2));
       furnitureList.forEach(f => dot(f.x, f.y, '#d9a572', 1.8));
       pointsOfInterest.forEach(p => dot(p.x, p.y, '#8cc7ff', 2.4));
@@ -1750,7 +1854,7 @@
       ctx.font = 'bold 14px sans-serif';
       ctx.fillText('Inventory', x + 10, y + 20);
 
-      const usedSlots = [wood, stones, fiber, ore, cloth, water, meat, herbs, hide, rope, traps].filter(v => v > 0).length + (hasPickaxe ? 1 : 0);
+      const usedSlots = [wood, stones, fiber, ore, cloth, water, meat, herbs, hide, rope, traps, carrots, berries, peppers, melons].filter(v => v > 0).length + (hasPickaxe ? 1 : 0);
       const capacity = 22 + upgradesCount;
 
       ctx.font = '12px sans-serif';
@@ -1766,7 +1870,8 @@
         `Ore: ${ore}`,
         `Cloth: ${cloth}`,
         `Rope: ${rope}`,
-        `Herbs: ${herbs}`
+        `Herbs: ${herbs}`,
+        `Carrots: ${carrots}`
       ];
       const right = [
         `Water: ${water}`,
@@ -1775,6 +1880,7 @@
         `Traps: ${traps}`,
         `Walls: ${wallList.length}`,
         `Furniture: ${furnitureList.length}`,
+        `Berries/Pepper/Melon: ${berries}/${peppers}/${melons}`,
         `Pickaxe: ${hasPickaxe ? 'Yes' : 'No'}`
       ];
 
@@ -1913,6 +2019,7 @@
 
       drawBackground();
       drawPointsOfInterest();
+      drawPlants();
       drawCampfire();
       drawCraftStation();
       drawTrees();
@@ -2000,6 +2107,11 @@
           if (sx >= x && sx <= x + slotW && sy >= hotbarY && sy <= hotbarY + slotH) {
             if (items[i].action === 'placeWall') placeWallKit();
             if (items[i].action === 'placeFurniture') placeFurnitureKit();
+            if (items[i].action === 'placeHeavyBarrier') placeHeavyBarrierKit();
+            if (items[i].action === 'eatCarrot') useHotbarFood('carrot');
+            if (items[i].action === 'eatBerry') useHotbarFood('berry');
+            if (items[i].action === 'eatPepper') useHotbarFood('pepper');
+            if (items[i].action === 'eatMelon') useHotbarFood('melon');
             return;
           }
         }
@@ -2032,13 +2144,7 @@
       reset();
     });
 
-    if (isIOS) {
-      document.body.classList.add('ios-device');
-      fullscreenBtn.textContent = 'iOS: Use Add to Home Screen';
-    }
-
     fullscreenBtn.addEventListener('click', async () => {
-      if (isIOS) return;
       try {
         if (!document.fullscreenElement) {
           await document.documentElement.requestFullscreen();
