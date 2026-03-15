@@ -185,7 +185,7 @@
     const BASE_FIRE_RADIUS = 120;
     const FIRE_RADIUS_PER_LEVEL = 30;
 
-    let player, monster, trees, rocks, trapList, wallList, furnitureList, pointsOfInterest, chests, animals, plants, keys;
+    let player, monster, extraMonster, trees, rocks, trapList, wallList, furnitureList, pointsOfInterest, chests, animals, plants, keys;
     let wood, stones, traps, health, maxHealth, fireBuilt, gameOver, firePower, fireLevel, torchTimerMs, energy;
     let fiber, ore, cloth, water, meat, herbs, hide, rope, carrots, berries, peppers, melons;
     let hasPickaxe, axePower, minePower, torchDurationBonusMs, torchRadiusBonus, trapSlowBonus, upgradesCount;
@@ -209,9 +209,13 @@
     let energyBoostTimerMs = 0;
     let mapOpen = false;
     let selectedHotbarIndex = 0;
+    let weatherType = 'clear';
+    let weatherTimerMs = 0;
+    let weatherMoveMult = 1;
+    let weatherFireDrainMult = 1;
 
-    const DAY_MS = 36000;
-    const NIGHT_MS = 36000;
+    const DAY_MS = 52000;
+    const NIGHT_MS = 22000;
     const NIGHT_BONUS_EVERY_5_DAYS_MS = 5000;
     const FIRE_LEVEL_ONE_COST = 4;
     const FIRE_POWER_MAX = 100;
@@ -362,6 +366,7 @@
     function reset() {
       player = { x: camp.x + 64, y: camp.y + 4, r: 12, baseSpeed: 2.45, speed: 2.45, angle: 0, walkPhase: 0, action: '', actionTimer: 0 };
       monster = { x: WORLD_W - 120, y: WORLD_H - 120, r: 14, speedDay: 2.0, speedNight: 2.8, slowTimer: 0 };
+      extraMonster = { x: WORLD_W - 260, y: WORLD_H - 200, r: 13, speedDay: 1.9, speedNight: 2.65, slowTimer: 0 };
       trees = spawnTrees(95);
       rocks = spawnRocks(68);
       trapList = [];
@@ -439,6 +444,10 @@
       energyBoostTimerMs = 0;
       mapOpen = false;
       selectedHotbarIndex = 0;
+      weatherType = 'clear';
+      weatherTimerMs = 0;
+      weatherMoveMult = 1;
+      weatherFireDrainMult = 1;
       renderCraftPanel();
       updateHud();
       startAmbient();
@@ -958,7 +967,7 @@
     function updatePlayer() {
       const energyBonus = (energy / 100) * 0.75;
       const sprintBonus = sprintBoostTimerMs > 0 ? 0.95 : 0;
-      player.speed = Math.max(1.25, player.baseSpeed + energyBonus + sprintBonus);
+      player.speed = Math.max(1.25, (player.baseSpeed + energyBonus + sprintBonus) * weatherMoveMult);
 
       let dx = 0, dy = 0;
       if (keys['w'] || keys['arrowup']) dy -= 1;
@@ -984,104 +993,109 @@
       player.y = clamp(player.y, player.r, WORLD_H - player.r);
     }
 
-    function updateMonster() {
-      const safeByCamp = fireBuilt && dist(player.x, player.y, camp.x, camp.y) <= currentFireRadius();
-      const safeByTorch = torchTimerMs > 0;
-      const unsafe = isNight && !(safeByCamp || safeByTorch);
-
-      if (!isNight) {
-        // hide far away during daytime
-        monster.x = WORLD_W + 120;
-        monster.y = WORLD_H + 120;
-        return;
+    function rollWeather() {
+      const intensity = Math.min(0.55, 0.12 + survivedNights * 0.03);
+      if (Math.random() > intensity) {
+        weatherType = 'clear';
+      } else {
+        const pool = ['rain','wind','storm','cold'];
+        weatherType = pool[Math.floor(Math.random() * pool.length)];
       }
 
+      weatherMoveMult = 1;
+      weatherFireDrainMult = 1;
+      if (weatherType === 'rain') {
+        weatherMoveMult = 0.94;
+        weatherFireDrainMult = 1.22;
+      } else if (weatherType === 'wind') {
+        weatherMoveMult = 0.9;
+        weatherFireDrainMult = 1.08;
+      } else if (weatherType === 'storm') {
+        weatherMoveMult = 0.82;
+        weatherFireDrainMult = 1.35;
+      } else if (weatherType === 'cold') {
+        weatherMoveMult = 0.88;
+        weatherFireDrainMult = 1.18;
+      }
+      weatherTimerMs = DAY_MS;
+    }
+
+    function isExtraMonsterNight() {
+      return isNight && ((survivedNights + 1) % 4 === 0);
+    }
+
+    function updateSingleMonster(m, unsafe, safeByTorch) {
       const tx = player.x;
       const ty = player.y;
-      monster.speedNight = player.speed + 0.55;
-      monster.speedDay = Math.max(1.8, player.speed - 0.15);
-      let speed = unsafe ? monster.speedNight : monster.speedDay;
-      if (monster.slowTimer > 0) {
+      const fixedNightSpeed = 3.05;
+      const fixedDaySpeed = 2.2;
+      let speed = unsafe ? fixedNightSpeed : fixedDaySpeed;
+      if (m.slowTimer > 0) {
         speed *= 0.45;
-        monster.slowTimer -= 1;
+        m.slowTimer -= 1;
       }
 
-      const dx = tx - monster.x;
-      const dy = ty - monster.y;
+      const dx = tx - m.x;
+      const dy = ty - m.y;
       const len = Math.hypot(dx, dy) || 1;
-      monster.x += (dx / len) * speed;
-      monster.y += (dy / len) * speed;
+      m.x += (dx / len) * speed;
+      m.y += (dy / len) * speed;
 
       if (fireBuilt) {
-        const dToCampRaw = dist(monster.x, monster.y, camp.x, camp.y);
-        const minDist = currentFireRadius() + monster.r + 2;
+        const dToCampRaw = dist(m.x, m.y, camp.x, camp.y);
+        const minDist = currentFireRadius() + m.r + 2;
         if (dToCampRaw < minDist) {
           const dToCamp = dToCampRaw || 1;
-          let awayX = (monster.x - camp.x) / dToCamp;
-          let awayY = (monster.y - camp.y) / dToCamp;
-          if (dToCampRaw === 0) {
-            awayX = 1;
-            awayY = 0;
-          }
-          monster.x = camp.x + awayX * minDist;
-          monster.y = camp.y + awayY * minDist;
+          let awayX = (m.x - camp.x) / dToCamp;
+          let awayY = (m.y - camp.y) / dToCamp;
+          if (dToCampRaw === 0) { awayX = 1; awayY = 0; }
+          m.x = camp.x + awayX * minDist;
+          m.y = camp.y + awayY * minDist;
         }
       }
 
       if (safeByTorch) {
         const torchRadius = TORCH_SAFE_RADIUS + torchRadiusBonus;
-        const dToPlayerRaw = dist(monster.x, monster.y, player.x, player.y);
-        const minDist = torchRadius + monster.r;
+        const dToPlayerRaw = dist(m.x, m.y, player.x, player.y);
+        const minDist = torchRadius + m.r;
         if (dToPlayerRaw < minDist) {
           const dToPlayer = dToPlayerRaw || 1;
-          monster.x = player.x + ((monster.x - player.x) / dToPlayer) * minDist;
-          monster.y = player.y + ((monster.y - player.y) / dToPlayer) * minDist;
+          m.x = player.x + ((m.x - player.x) / dToPlayer) * minDist;
+          m.y = player.y + ((m.y - player.y) / dToPlayer) * minDist;
         }
       }
 
       for (const tr of trapList) {
-        if (dist(monster.x, monster.y, tr.x, tr.y) < monster.r + tr.r) {
-          monster.slowTimer = 120 + trapSlowBonus;
+        if (dist(m.x, m.y, tr.x, tr.y) < m.r + tr.r) {
+          m.slowTimer = 120 + trapSlowBonus;
           sfxTrapSnap();
-          const dxPush = monster.x - tr.x;
-          const dyPush = monster.y - tr.y;
+          const dxPush = m.x - tr.x;
+          const dyPush = m.y - tr.y;
           const lenPush = Math.hypot(dxPush, dyPush) || 1;
-          monster.x += (dxPush / lenPush) * 18;
-          monster.y += (dyPush / lenPush) * 18;
+          m.x += (dxPush / lenPush) * 18;
+          m.y += (dyPush / lenPush) * 18;
           tr.ttl = 0;
         }
       }
 
       for (const w of wallList) {
-        const dWall = dist(monster.x, monster.y, w.x, w.y);
-        if (dWall < monster.r + w.r) {
-          const nx = (monster.x - w.x) / (dWall || 1);
-          const ny = (monster.y - w.y) / (dWall || 1);
-          monster.x = w.x + nx * (monster.r + w.r + 1);
-          monster.y = w.y + ny * (monster.r + w.r + 1);
+        const dWall = dist(m.x, m.y, w.x, w.y);
+        if (dWall < m.r + w.r) {
+          const nx = (m.x - w.x) / (dWall || 1);
+          const ny = (m.y - w.y) / (dWall || 1);
+          m.x = w.x + nx * (m.r + w.r + 1);
+          m.y = w.y + ny * (m.r + w.r + 1);
           w.hp -= 0.28;
         }
       }
-      wallList = wallList.filter(w => w.hp > 0);
 
-      if (hitCooldown > 0) hitCooldown -= 1;
-      if (growlCooldown > 0) growlCooldown -= 1;
-
-      if (unsafe && growlCooldown <= 0) {
-        sfxGrowl();
-        growlCooldown = 70;
-      }
-
-      if (unsafe && dist(monster.x, monster.y, player.x, player.y) < monster.r + player.r + 2) {
+      if (unsafe && dist(m.x, m.y, player.x, player.y) < m.r + player.r + 2) {
         if (monsterAttackCooldownMs <= 0) {
           const hitDamage = 15 + Math.floor(Math.random() * 11);
           health -= hitDamage;
           damageFlashTimer = 16;
           monsterAttackCooldownMs = 1000;
-          if (hitCooldown <= 0) {
-            sfxHit();
-            hitCooldown = 12;
-          }
+          if (hitCooldown <= 0) { sfxHit(); hitCooldown = 12; }
           if (health <= 0) {
             health = 0;
             gameOver = true;
@@ -1095,6 +1109,32 @@
       }
     }
 
+    function updateMonster() {
+      const safeByCamp = fireBuilt && dist(player.x, player.y, camp.x, camp.y) <= currentFireRadius();
+      const safeByTorch = torchTimerMs > 0;
+      const unsafe = isNight && !(safeByCamp || safeByTorch);
+
+      if (!isNight) {
+        monster.x = WORLD_W + 120;
+        monster.y = WORLD_H + 120;
+        extraMonster.x = WORLD_W + 240;
+        extraMonster.y = WORLD_H + 240;
+        return;
+      }
+
+      if (hitCooldown > 0) hitCooldown -= 1;
+      if (growlCooldown > 0) growlCooldown -= 1;
+      if (unsafe && growlCooldown <= 0) {
+        sfxGrowl();
+        growlCooldown = 70;
+      }
+
+      updateSingleMonster(monster, unsafe, safeByTorch);
+      if (isExtraMonsterNight()) updateSingleMonster(extraMonster, unsafe, safeByTorch);
+
+      wallList = wallList.filter(w => w.hp > 0);
+    }
+
     function updateCycle() {
       const dt = 16.67;
       dayNightTimer += dt;
@@ -1105,7 +1145,7 @@
       if (fireBuilt) {
         const drainPerSec = isNight ? FIRE_DRAIN_NIGHT_PER_SEC : FIRE_DRAIN_DAY_PER_SEC;
         const levelBurnBonus = 1 + Math.max(0, fireLevel - 1) * 0.35;
-        firePower = Math.max(0, firePower - (drainPerSec / levelBurnBonus) * (dt / 1000));
+        firePower = Math.max(0, firePower - (drainPerSec * weatherFireDrainMult / levelBurnBonus) * (dt / 1000));
         if (firePower <= 0) {
           fireBuilt = false;
           firePower = 0;
@@ -1164,6 +1204,7 @@
         dayNightTimer = 0;
         survivedNights += 1;
         currentNightMs = NIGHT_MS + Math.floor(survivedNights / 5) * NIGHT_BONUS_EVERY_5_DAYS_MS;
+        rollWeather();
         sfxNightToDay();
         stopNightPulse();
         updateHud();
@@ -1608,6 +1649,10 @@
     }
 
     function drawMonster() {
+      ctx.fillStyle = '#c8dcff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText(`Weather: ${weatherType.toUpperCase()}${weatherType !== 'clear' ? ' (effects active)' : ''}`, 20, 74);
+
       if (!isNight) return; // hidden in daytime
 
       const pulse = Math.sin(Date.now() * 0.017) * 3;
@@ -1968,6 +2013,10 @@
         ctx.fillText('Craft Station nearby: open menu with C. Craft Wall/Furniture here.', 20, 28);
       }
 
+      ctx.fillStyle = '#c8dcff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText(`Weather: ${weatherType.toUpperCase()}${weatherType !== 'clear' ? ' (effects active)' : ''}`, 20, 74);
+
       if (!isNight) return;
       ctx.font = 'bold 16px sans-serif';
       if (!fireBuilt) {
@@ -1979,6 +2028,11 @@
       } else {
         ctx.fillStyle = '#e9ffd7';
         ctx.fillText('You are safe in firelight.', 20, 52);
+      }
+
+      if (isExtraMonsterNight()) {
+        ctx.fillStyle = '#ffd8a6';
+        ctx.fillText('Blood Moon: Extra monster tonight (every 4th night)!', 20, 96);
       }
     }
 
@@ -2219,6 +2273,7 @@
       startOverlay.style.display = 'none';
       initAudio();
       reset();
+      rollWeather();
       tick();
     }
 
