@@ -44,8 +44,8 @@
       margin-bottom: 0;
     }
     .chip {
-      background: linear-gradient(180deg, #131c3a, #0f1732);
-      border: 1px solid #3a56a0;
+      background: linear-gradient(180deg, rgba(25,39,82,.95), rgba(11,20,44,.95));
+      border: 1px solid #5c82ee;
       border-radius: 10px;
       padding: 8px;
       text-align: center;
@@ -76,7 +76,7 @@
     }
     .craft-panel {
       margin-top: 10px;
-      border: 1px solid #3a56a0;
+      border: 1px solid #5c82ee;
       border-radius: 10px;
       background: linear-gradient(180deg, rgba(11,18,37,.98), rgba(8,14,28,.98));
       padding: 10px;
@@ -189,8 +189,8 @@
     let wood, stones, traps, health, maxHealth, fireBuilt, gameOver, firePower, fireLevel, torchTimerMs, energy;
     let fiber, ore, cloth, water, meat, herbs, hide, rope, carrots, berries, peppers, melons;
     let hasPickaxe, axePower, minePower, torchDurationBonusMs, torchRadiusBonus, trapSlowBonus, upgradesCount;
-    let bootsLevel, jacketLevel, axeLevel, lanternLevel, trapperLevel;
-    let wallKits, furnitureKits, heavyBarrierKits;
+    let bootsLevel, jacketLevel, axeLevel, lanternLevel, trapperLevel, canteenLevel, backpackLevel;
+    let wallKits, furnitureKits, heavyBarrierKits, spikeTrapKits, healerTotems;
     let dayNightTimer, isNight, survivedNights, currentNightMs;
     let footstepCooldown = 0;
     let gameStarted = false;
@@ -205,9 +205,13 @@
     let joyDx = 0;
     let joyDy = 0;
     let sprintBoostTimerMs = 0;
+    let healBoostTimerMs = 0;
+    let energyBoostTimerMs = 0;
+    let mapOpen = false;
+    let selectedHotbarIndex = 0;
 
-    const DAY_MS = 22000;
-    const NIGHT_MS = 30000;
+    const DAY_MS = 36000;
+    const NIGHT_MS = 36000;
     const NIGHT_BONUS_EVERY_5_DAYS_MS = 5000;
     const FIRE_LEVEL_ONE_COST = 4;
     const FIRE_POWER_MAX = 100;
@@ -232,21 +236,27 @@
       lantern1: { wood: 6, stone: 5 },
       lantern2: { wood: 10, stone: 9 },
       trapper1: { wood: 8, stone: 8 },
-      trapper2: { wood: 14, stone: 14 }
+      trapper2: { wood: 14, stone: 14 },
+      canteen: { wood: 7, stone: 4 },
+      backpack: { wood: 10, stone: 6 }
     };
 
     const TABLE_RECIPES = {
       wall: { wood: 5, stone: 2 },
       furniture: { wood: 4, stone: 1 },
       heavyBarrier: { wood: 10, stone: 8 },
-      firecore: { wood: 12, stone: 12 }
+      firecore: { wood: 12, stone: 12 },
+      spikeKit: { wood: 9, stone: 9 },
+      healer: { wood: 11, stone: 10 }
     };
 
     const TABLE_CRAFT_OPTIONS = [
       { slot: '1', key: 'wall', name: 'Wall Kit', desc: 'Defensive wall' },
       { slot: '2', key: 'furniture', name: 'Furniture', desc: 'Comfort furniture' },
       { slot: '3', key: 'heavyBarrier', name: 'Heavy Barrier Kit', desc: 'Placeable heavy wall' },
-      { slot: '4', key: 'firecore', name: 'Fire Core', desc: 'Fire burns longer' }
+      { slot: '4', key: 'firecore', name: 'Fire Core', desc: 'Fire burns longer' },
+      { slot: '5', key: 'spikeKit', name: 'Spike Trap Kit', desc: 'Placeable damage trap' },
+      { slot: '6', key: 'healer', name: 'Healer Totem', desc: 'Passive heal near camp' }
     ];
 
     const REGULAR_CRAFT_OPTIONS = [
@@ -255,7 +265,9 @@
       { slot: '3', key: 'jacket', name: 'Jacket', desc: '+Max HP (2 levels)', cost: () => jacketLevel === 0 ? REGULAR_RECIPES.jacket1 : REGULAR_RECIPES.jacket2 },
       { slot: '4', key: 'axe', name: 'Axe+', desc: '+Tree damage (2 levels)', cost: () => axeLevel === 0 ? REGULAR_RECIPES.axe1 : REGULAR_RECIPES.axe2 },
       { slot: '5', key: 'lantern', name: 'Lantern', desc: '+Torch power (2 levels)', cost: () => lanternLevel === 0 ? REGULAR_RECIPES.lantern1 : REGULAR_RECIPES.lantern2 },
-      { slot: '6', key: 'trapper', name: 'Trap+', desc: '+Trap slow (2 levels)', cost: () => trapperLevel === 0 ? REGULAR_RECIPES.trapper1 : REGULAR_RECIPES.trapper2 }
+      { slot: '6', key: 'trapper', name: 'Trap+', desc: '+Trap slow (2 levels)', cost: () => trapperLevel === 0 ? REGULAR_RECIPES.trapper1 : REGULAR_RECIPES.trapper2 },
+      { slot: '7', key: 'canteen', name: 'Canteen', desc: 'Longer food buffs', cost: () => REGULAR_RECIPES.canteen },
+      { slot: '8', key: 'backpack', name: 'Backpack', desc: '+Inventory capacity', cost: () => REGULAR_RECIPES.backpack }
     ];
 
     // --- audio ---
@@ -396,9 +408,13 @@
       axeLevel = 0;
       lanternLevel = 0;
       trapperLevel = 0;
+      canteenLevel = 0;
+      backpackLevel = 0;
       wallKits = 0;
       furnitureKits = 0;
       heavyBarrierKits = 0;
+      spikeTrapKits = 0;
+      healerTotems = 0;
       fireBuilt = false;
       firePower = 0;
       fireLevel = 0;
@@ -419,6 +435,10 @@
       rulebookOpen = false;
       inventoryOpen = false;
       sprintBoostTimerMs = 0;
+      healBoostTimerMs = 0;
+      energyBoostTimerMs = 0;
+      mapOpen = false;
+      selectedHotbarIndex = 0;
       renderCraftPanel();
       updateHud();
       startAmbient();
@@ -571,7 +591,7 @@
     }
 
     function chopTree() {
-      if (gameOver) return;
+      if (gameOver || currentHeldAction() !== 'axe') return;
       initAudio();
       const t = nearestTreeInRange();
       if (!t) return;
@@ -639,7 +659,7 @@
     }
 
     function mineRock() {
-      if (gameOver || !hasPickaxe) return;
+      if (gameOver || !hasPickaxe || currentHeldAction() !== 'pickaxe') return;
       initAudio();
       const r = nearestRockInRange();
       if (!r) return;
@@ -720,6 +740,10 @@
       } else if (slot === '6' && trapperLevel < 2) {
         const recipe = trapperLevel === 0 ? REGULAR_RECIPES.trapper1 : REGULAR_RECIPES.trapper2;
         if (spend(recipe)) { trapperLevel += 1; trapSlowBonus += trapperLevel === 1 ? 60 : 90; crafted = true; }
+      } else if (slot === '7' && canteenLevel < 1 && spend(REGULAR_RECIPES.canteen)) {
+        canteenLevel = 1; crafted = true;
+      } else if (slot === '8' && backpackLevel < 1 && spend(REGULAR_RECIPES.backpack)) {
+        backpackLevel = 1; crafted = true;
       }
 
       if (crafted) {
@@ -748,6 +772,12 @@
         fireLevel = Math.min(FIRE_MAX_LEVEL, fireLevel + 1);
         fireBuilt = fireLevel > 0 ? true : fireBuilt;
         firePower = Math.max(firePower, 35);
+        crafted = true;
+      } else if (slot === '5' && spend(TABLE_RECIPES.spikeKit)) {
+        spikeTrapKits += 1;
+        crafted = true;
+      } else if (slot === '6' && spend(TABLE_RECIPES.healer)) {
+        healerTotems += 1;
         crafted = true;
       }
 
@@ -786,6 +816,22 @@
       updateHud();
     }
 
+    function placeSpikeTrapKit() {
+      if (spikeTrapKits <= 0) return;
+      spikeTrapKits -= 1;
+      trapList.push({ x: player.x, y: player.y, r: 21, ttl: 32000 });
+      sfxBuild();
+      updateHud();
+    }
+
+    function placeHealerTotem() {
+      if (healerTotems <= 0) return;
+      healerTotems -= 1;
+      furnitureList.push({ x: player.x, y: player.y, r: 16, type: 'totem' });
+      sfxBuild();
+      updateHud();
+    }
+
     function nearestPoiInRange() {
       let best = null, bestD = Infinity;
       for (const p of pointsOfInterest) {
@@ -817,19 +863,20 @@
     }
 
     function useHotbarFood(kind) {
+      const bonusDur = canteenLevel > 0 ? 3000 : 0;
       if (kind === 'carrot' && carrots > 0) {
         carrots -= 1;
-        energy = Math.min(100, energy + 20);
+        energyBoostTimerMs = Math.max(energyBoostTimerMs, 9000 + bonusDur);
       } else if (kind === 'berry' && berries > 0) {
         berries -= 1;
-        health = Math.min(maxHealth, health + 12);
+        healBoostTimerMs = Math.max(healBoostTimerMs, 8000 + bonusDur);
       } else if (kind === 'pepper' && peppers > 0) {
         peppers -= 1;
-        sprintBoostTimerMs = Math.max(sprintBoostTimerMs, 6000);
+        sprintBoostTimerMs = Math.max(sprintBoostTimerMs, 7000 + bonusDur);
       } else if (kind === 'melon' && melons > 0) {
         melons -= 1;
-        health = Math.min(maxHealth, health + 18);
-        energy = Math.min(100, energy + 18);
+        healBoostTimerMs = Math.max(healBoostTimerMs, 7000 + bonusDur);
+        energyBoostTimerMs = Math.max(energyBoostTimerMs, 7000 + bonusDur);
       } else {
         return;
       }
@@ -866,14 +913,6 @@
       if (gatherPlant()) return;
       if (openChest()) return;
       if (huntAnimal()) return;
-      if (nearestTreeInRange()) {
-        chopTree();
-        return;
-      }
-      if (nearestRockInRange()) {
-        mineRock();
-        return;
-      }
     }
 
     function tryBuildFire() {
@@ -1085,8 +1124,12 @@
 
       monsterAttackCooldownMs = Math.max(0, monsterAttackCooldownMs - dt);
       sprintBoostTimerMs = Math.max(0, sprintBoostTimerMs - dt);
+      healBoostTimerMs = Math.max(0, healBoostTimerMs - dt);
+      energyBoostTimerMs = Math.max(0, energyBoostTimerMs - dt);
       if (damageFlashTimer > 0) damageFlashTimer -= 1;
       energy = Math.max(0, energy - (isNight ? 0.028 : 0.018) * (dt / 16.67));
+      if (energyBoostTimerMs > 0) energy = Math.min(100, energy + 0.08 * (dt / 16.67));
+      if (healBoostTimerMs > 0) health = Math.min(maxHealth, health + 0.06 * (dt / 16.67));
 
       for (const a of animals) {
         a.stepTimer -= 1;
@@ -1158,6 +1201,11 @@
           ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
           ctx.fill();
         }
+        ctx.fillStyle = 'rgba(230,245,255,.45)';
+        ctx.font = 'bold 22px sans-serif';
+        ctx.fillText('Frost Meadow', WORLD_W * 0.1, WORLD_H * 0.12);
+        ctx.fillText('Amber Dunes', WORLD_W * 0.68, WORLD_H * 0.18);
+        ctx.fillText('Emerald Marsh', WORLD_W * 0.55, WORLD_H * 0.68);
       }
 
       const edgeFog = ctx.createRadialGradient(WORLD_W/2, WORLD_H/2, Math.min(WORLD_W, WORLD_H)*0.22, WORLD_W/2, WORLD_H/2, Math.max(WORLD_W, WORLD_H)*0.72);
@@ -1536,13 +1584,16 @@
       ctx.fillRect(-6 + legSwing * 0.25, 14, 4.2, 7);
       ctx.fillRect(1.8 - legSwing * 0.25, 14, 4.2, 7);
 
-      if (player.action === 'chop' || player.action === 'mine') {
-        ctx.strokeStyle = '#d9ecff';
-        ctx.lineWidth = 2;
+      const held = currentHeldAction();
+      if (held === 'axe' || held === 'pickaxe') {
+        ctx.strokeStyle = held === 'pickaxe' ? '#c7d7f3' : '#d9ecff';
+        ctx.lineWidth = 2.4;
         ctx.beginPath();
         ctx.moveTo(7, -2);
-        ctx.lineTo(15, -12);
+        ctx.lineTo(16, -13);
         ctx.stroke();
+        ctx.fillStyle = held === 'pickaxe' ? '#8ea2c8' : '#b98b57';
+        ctx.fillRect(14, -15, 6, 4);
       }
       ctx.restore();
 
@@ -1634,6 +1685,21 @@
       ctx.stroke();
     }
 
+    function drawPlacementPreview() {
+      const action = currentHeldAction();
+      if (!['placeWall','placeFurniture','placeHeavyBarrier','placeSpikeTrap','placeHealerTotem'].includes(action)) return;
+      const px = player.x, py = player.y;
+      const r = action === 'placeHeavyBarrier' ? 24 : (action === 'placeSpikeTrap' ? 21 : 18);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,.7)';
+      ctx.setLineDash([6,4]);
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
     function drawOverlay() {
       if (isNight) {
         ctx.fillStyle = 'rgba(10, 12, 30, 0.34)';
@@ -1704,50 +1770,85 @@
     }
 
     function getHotbarItems() {
-      const items = [{ name: 'Axe', active: true, count: '', action: null }];
-      if (hasPickaxe) items.push({ name: 'Pickaxe', active: true, count: '', action: null });
-      if (wallKits > 0) items.push({ name: 'Wall Kit', active: true, count: wallKits, action: 'placeWall' });
-      if (furnitureKits > 0) items.push({ name: 'Furniture', active: true, count: furnitureKits, action: 'placeFurniture' });
-      if (heavyBarrierKits > 0) items.push({ name: 'Heavy Barrier', active: true, count: heavyBarrierKits, action: 'placeHeavyBarrier' });
-      if (carrots > 0) items.push({ name: 'Carrot ⚡', active: true, count: carrots, action: 'eatCarrot' });
-      if (berries > 0) items.push({ name: 'Berry ❤️', active: true, count: berries, action: 'eatBerry' });
-      if (peppers > 0) items.push({ name: 'Pepper 🏃', active: true, count: peppers, action: 'eatPepper' });
-      if (melons > 0) items.push({ name: 'Melon 💚', active: true, count: melons, action: 'eatMelon' });
-      return items;
+      const items = [
+        { name: 'Axe', count: '', action: 'axe' },
+        hasPickaxe ? { name: 'Pickaxe', count: '', action: 'pickaxe' } : null,
+        wallKits > 0 ? { name: 'Wall Kit', count: wallKits, action: 'placeWall' } : null,
+        furnitureKits > 0 ? { name: 'Furniture', count: furnitureKits, action: 'placeFurniture' } : null,
+        heavyBarrierKits > 0 ? { name: 'Heavy Barrier', count: heavyBarrierKits, action: 'placeHeavyBarrier' } : null,
+        spikeTrapKits > 0 ? { name: 'Spike Trap', count: spikeTrapKits, action: 'placeSpikeTrap' } : null,
+        healerTotems > 0 ? { name: 'Healer Totem', count: healerTotems, action: 'placeHealerTotem' } : null,
+        carrots > 0 ? { name: 'Carrot ⚡', count: carrots, action: 'eatCarrot' } : null,
+        berries > 0 ? { name: 'Berry ❤️', count: berries, action: 'eatBerry' } : null,
+        peppers > 0 ? { name: 'Pepper 🏃', count: peppers, action: 'eatPepper' } : null,
+        melons > 0 ? { name: 'Melon 💚', count: melons, action: 'eatMelon' } : null
+      ].filter(Boolean);
+      const slots = Array.from({ length: 10 }, () => null);
+      for (let i = 0; i < Math.min(10, items.length); i++) slots[i] = items[i];
+      return slots;
+    }
+
+    function currentHeldAction() {
+      const item = getHotbarItems()[selectedHotbarIndex];
+      return item ? item.action : null;
+    }
+
+    function useSelectedHotbarItem() {
+      const action = currentHeldAction();
+      if (!action) return;
+      if (action === 'axe') { chopTree(); return; }
+      if (action === 'pickaxe') { mineRock(); return; }
+      if (action === 'placeWall') placeWallKit();
+      if (action === 'placeFurniture') placeFurnitureKit();
+      if (action === 'placeHeavyBarrier') placeHeavyBarrierKit();
+      if (action === 'placeSpikeTrap') placeSpikeTrapKit();
+      if (action === 'placeHealerTotem') placeHealerTotem();
+      if (action === 'eatCarrot') useHotbarFood('carrot');
+      if (action === 'eatBerry') useHotbarFood('berry');
+      if (action === 'eatPepper') useHotbarFood('pepper');
+      if (action === 'eatMelon') useHotbarFood('melon');
     }
 
     function drawHotbar() {
-      const slotW = 102;
+      const slotW = 95;
       const slotH = 58;
-      const gap = 10;
+      const gap = 8;
       const items = getHotbarItems();
-
-      const totalW = items.length * slotW + (items.length - 1) * gap;
+      const totalW = 10 * slotW + 9 * gap;
       const startX = Math.round((W - totalW) / 2);
       const y = H - 86;
+      const labels = ['1','2','3','4','5','6','7','8','9','0'];
 
-      items.forEach((it, i) => {
+      for (let i = 0; i < 10; i++) {
+        const it = items[i];
         const x = startX + i * (slotW + gap);
-        ctx.fillStyle = 'rgba(13,22,43,.92)';
+        ctx.fillStyle = i === selectedHotbarIndex ? 'rgba(28,46,88,.98)' : 'rgba(10,18,36,.92)';
         ctx.fillRect(x, y, slotW, slotH);
-        ctx.strokeStyle = i === 0 ? '#ffcf7a' : '#6d92ff';
-        ctx.lineWidth = i === 0 ? 2.5 : 2;
+        ctx.strokeStyle = i === selectedHotbarIndex ? '#ffd277' : '#5d87f5';
+        ctx.lineWidth = i === selectedHotbarIndex ? 2.5 : 1.7;
         ctx.strokeRect(x, y, slotW, slotH);
 
-        ctx.fillStyle = '#e6efff';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.fillText(it.name, x + 8, y + 18);
+        ctx.fillStyle = '#a8c4ff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText(labels[i], x + 6, y + 13);
 
-        ctx.fillStyle = '#bcd0ff';
-        ctx.font = '12px sans-serif';
-        if (it.count !== '') ctx.fillText(String(it.count), x + 8, y + 38);
-      });
+        if (it) {
+          ctx.fillStyle = '#e6efff';
+          ctx.font = 'bold 11px sans-serif';
+          ctx.fillText(it.name.slice(0, 12), x + 8, y + 30);
+          ctx.fillStyle = '#bcd0ff';
+          ctx.font = '12px sans-serif';
+          if (it.count !== '') ctx.fillText(String(it.count), x + 8, y + 48);
+        }
+      }
     }
 
     function drawCraftPanelCanvas() {
       if (!craftOpen) return;
       const nearStation = isNearCraftStation();
-      const w = 620, h = 430;
+      const w = 620;
+      const options = nearStation ? TABLE_CRAFT_OPTIONS : REGULAR_CRAFT_OPTIONS;
+      const h = 130 + options.length * 58;
       const x = Math.round((W - w) / 2);
       const y = Math.round((H - h) / 2);
       ctx.fillStyle = 'rgba(8,14,28,.96)';
@@ -1759,7 +1860,6 @@
       ctx.font = 'bold 24px sans-serif';
       ctx.fillText(nearStation ? 'Crafting Station (click an item to craft)' : 'Regular Crafting (click an item to craft)', x + 18, y + 34);
 
-      const options = nearStation ? TABLE_CRAFT_OPTIONS : REGULAR_CRAFT_OPTIONS;
       ctx.font = '18px sans-serif';
       options.forEach((opt, idx) => {
         const c = nearStation ? TABLE_RECIPES[opt.key] : opt.cost();
@@ -1780,66 +1880,29 @@
       });
     }
 
-    function drawMiniMap() {
-      const mapX = 20, mapY = 20, mapR = 78;
-      const scale = 0.12;
-      ctx.save();
-      ctx.translate(mapX + mapR, mapY + mapR);
-      ctx.fillStyle = 'rgba(8,14,28,.86)';
-      ctx.beginPath();
-      ctx.arc(0, 0, mapR, 0, Math.PI * 2);
-      ctx.fill();
+    function drawBigMap() {
+      if (!mapOpen) return;
+      const mapW = 760, mapH = 500;
+      const mapX = Math.round((W - mapW) / 2), mapY = Math.round((H - mapH) / 2);
+      ctx.fillStyle = 'rgba(6,12,25,.94)';
+      ctx.fillRect(mapX, mapY, mapW, mapH);
       ctx.strokeStyle = '#6d92ff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(0, 0, mapR - 2, 0, Math.PI * 2);
-      ctx.clip();
-
-      // fixed north-up map (no rotation)
-
-      const dot = (x, y, color, r = 3) => {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc((x - player.x) * scale, (y - player.y) * scale, r, 0, Math.PI * 2);
-        ctx.fill();
-      };
-
-      dot(camp.x, camp.y, '#ffb56e', 4);
-      dot(craftStation.x, craftStation.y, '#c3d4ff', 3.5);
-      chests.forEach(c => dot(c.x, c.y, '#f1c27b', 2.4));
-      trees.forEach(t => dot(t.x, t.y, '#6fe08b', 2.2));
-      rocks.forEach(r => dot(r.x, r.y, '#b9c6da', 2.2));
-      plants.forEach(pl => dot(pl.x, pl.y, '#ff7f7f', 1.9));
-      wallList.forEach(w => dot(w.x, w.y, '#b99468', 2));
-      furnitureList.forEach(f => dot(f.x, f.y, '#d9a572', 1.8));
-      pointsOfInterest.forEach(p => dot(p.x, p.y, '#8cc7ff', 2.4));
-      trapList.forEach(tr => dot(tr.x, tr.y, '#ffd26b', 2.2));
-      if (isNight) dot(monster.x, monster.y, '#ff5757', 3.4);
-
-      ctx.restore();
-
-      const toCampX = (camp.x - player.x) * scale;
-      const toCampY = (camp.y - player.y) * scale;
-      const ang = Math.atan2(toCampY, toCampX);
-      const arrowR = mapR - 12;
-      const ax = mapX + mapR + Math.cos(ang) * arrowR;
-      const ay = mapY + mapR + Math.sin(ang) * arrowR;
-      ctx.fillStyle = '#ffcf7a';
-      ctx.beginPath();
-      ctx.moveTo(ax + Math.cos(ang) * 8, ay + Math.sin(ang) * 8);
-      ctx.lineTo(ax + Math.cos(ang + 2.4) * 6, ay + Math.sin(ang + 2.4) * 6);
-      ctx.lineTo(ax + Math.cos(ang - 2.4) * 6, ay + Math.sin(ang - 2.4) * 6);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(mapX + mapR, mapY + mapR, 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#d6e5ff';
-      ctx.font = '12px sans-serif';
-      ctx.fillText('Map', mapX + 8, mapY + mapR * 2 + 16);
+      ctx.lineWidth = 3;
+      ctx.strokeRect(mapX, mapY, mapW, mapH);
+      const scaleX = (mapW - 50) / WORLD_W;
+      const scaleY = (mapH - 70) / WORLD_H;
+      const dot = (x,y,color,r=3) => { ctx.fillStyle=color; ctx.beginPath(); ctx.arc(mapX+25+x*scaleX,mapY+35+y*scaleY,r,0,Math.PI*2); ctx.fill(); };
+      ctx.fillStyle = '#9dc6ff';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText('World Map (M to close)', mapX + 20, mapY + 24);
+      dot(camp.x,camp.y,'#ffb56e',5);
+      dot(craftStation.x,craftStation.y,'#c3d4ff',4);
+      trees.forEach(t=>dot(t.x,t.y,'#6fe08b',1.8));
+      rocks.forEach(r=>dot(r.x,r.y,'#b9c6da',1.8));
+      plants.forEach(pl=>dot(pl.x,pl.y,'#ff7f7f',1.6));
+      pointsOfInterest.forEach(p=>dot(p.x,p.y,'#8cc7ff',2.2));
+      dot(player.x,player.y,'#ffffff',4);
+      if (isNight) dot(monster.x,monster.y,'#ff5757',3.2);
     }
 
     function drawInventory() {
@@ -1855,7 +1918,7 @@
       ctx.fillText('Inventory', x + 10, y + 20);
 
       const usedSlots = [wood, stones, fiber, ore, cloth, water, meat, herbs, hide, rope, traps, carrots, berries, peppers, melons].filter(v => v > 0).length + (hasPickaxe ? 1 : 0);
-      const capacity = 22 + upgradesCount;
+      const capacity = 22 + upgradesCount + (backpackLevel ? 8 : 0);
 
       ctx.font = '12px sans-serif';
       ctx.fillStyle = '#9ed0ff';
@@ -1934,12 +1997,14 @@
       const lines = [
         '• Goal: survive nights, upgrade campfire, and outlast the monster.',
         '• Movement: WASD/Arrow keys.',
-        '• E: Interact (campfire, gather, chop/mine, open chests).',
+        '• E: Interact (campfire, gather, open chests).',
         '• R: toggle this Rulebook on PC.',
+        '• M: toggle large world map.',
         '• Q: place trap (cost 3 wood + 2 stone).',
         '• T: light torch (cost 8 wood).',
         '• C: open/close craft menu.',
-        '• Regular crafting: keys 1-6 for personal upgrades (not in table panel).',
+        '• Click/tap screen to use currently selected hotbar item.',
+        '• Number keys 1..0 select one of 10 hotbar slots.',
         '• Crafting station: press C near the station, then click item to craft.',
         '• Campfire: once a fire level upgrades, it keeps 20% power.',
         '• Gather extra resources at POIs: Pond/ Grove/ Ruins.'
@@ -2030,16 +2095,17 @@
       drawTraps();
       drawPlayer();
       drawMonster();
+      drawPlacementPreview();
       ctx.restore();
 
       drawOverlay();
-      drawMiniMap();
       drawInventory();
       drawWarnings();
       drawFirePowerBar();
       drawEnergyBar();
       drawHotbar();
       drawCraftPanelCanvas();
+      drawBigMap();
       drawRulebook();
       drawJumpscare();
       drawGameOver();
@@ -2058,6 +2124,11 @@
 
       if (k === 'i') {
         inventoryOpen = !inventoryOpen;
+        return;
+      }
+
+      if (k === 'm') {
+        mapOpen = !mapOpen;
         return;
       }
 
@@ -2080,7 +2151,8 @@
       if (k === 'q') craftTrap();
       if (k === 't') igniteTorch();
       if (k === 'x') consumeFood();
-      if (k >= '1' && k <= '6') craftRegular(k);
+      const numMap = { '1':0,'2':1,'3':2,'4':3,'5':4,'6':5,'7':6,'8':7,'9':8,'0':9 };
+      if (numMap[k] !== undefined) { selectedHotbarIndex = numMap[k]; return; }
       if (k === 'f') tryBuildFire(); // alias for old control
     });
 
@@ -2095,33 +2167,14 @@
       const sy = (e.clientY - rect.top) * (canvas.height / rect.height);
 
       if (!craftOpen) {
-        const slotW = 102;
-        const slotH = 58;
-        const gap = 10;
-        const items = getHotbarItems();
-        const totalW = items.length * slotW + (items.length - 1) * gap;
-        const startX = Math.round((W - totalW) / 2);
-        const hotbarY = H - 86;
-        for (let i = 0; i < items.length; i++) {
-          const x = startX + i * (slotW + gap);
-          if (sx >= x && sx <= x + slotW && sy >= hotbarY && sy <= hotbarY + slotH) {
-            if (items[i].action === 'placeWall') placeWallKit();
-            if (items[i].action === 'placeFurniture') placeFurnitureKit();
-            if (items[i].action === 'placeHeavyBarrier') placeHeavyBarrierKit();
-            if (items[i].action === 'eatCarrot') useHotbarFood('carrot');
-            if (items[i].action === 'eatBerry') useHotbarFood('berry');
-            if (items[i].action === 'eatPepper') useHotbarFood('pepper');
-            if (items[i].action === 'eatMelon') useHotbarFood('melon');
-            return;
-          }
-        }
+        useSelectedHotbarItem();
         return;
       }
 
       const nearStation = isNearCraftStation();
       const options = nearStation ? TABLE_CRAFT_OPTIONS : REGULAR_CRAFT_OPTIONS;
       const panelW = 620;
-      const panelH = 430;
+      const panelH = 130 + options.length * 58;
       const panelX = Math.round((W - panelW) / 2);
       const panelY = Math.round((H - panelH) / 2);
       if (sx < panelX || sx > panelX + panelW || sy < panelY || sy > panelY + panelH) return;
