@@ -7,16 +7,17 @@
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
-    body { margin: 0; background: #070b18; color: #eef3ff; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    body { margin: 0; background: radial-gradient(circle at top,#111b35,#070b18 60%); color: #eef3ff; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
     .layout { display: grid; grid-template-columns: 1fr 320px; min-height: 100vh; }
     canvas { width: 100%; height: 100vh; display: block; background: #101a2f; }
-    .panel { border-left: 1px solid #2d4377; background: linear-gradient(180deg,#0d1730,#091022); padding: 14px; }
+    .panel { border-left: 1px solid #2d4377; background: linear-gradient(180deg,#122247,#0a1328); padding: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
     h1 { margin: 0 0 6px; font-size: 21px; }
     .muted { opacity: .8; font-size: 13px; margin-bottom: 10px; }
-    .stat { background:#121f3f; border:1px solid #3a56a0; border-radius:10px; padding:8px; margin-bottom:8px; font-size:14px; }
+    .stat { background:linear-gradient(180deg,#182a52,#101d3d); border:1px solid #4a6bc2; border-radius:10px; padding:8px; margin-bottom:8px; font-size:14px; }
     .grid { display: grid; gap: 8px; }
-    button { border:1px solid #4967b8; background:#1b2c55; color:#fff; border-radius:9px; padding:9px; text-align:left; cursor:pointer; }
-    button.active { outline: 2px solid #ffd47f; background:#253f74; }
+    button { border:1px solid #5a80e0; background:linear-gradient(180deg,#284784,#1b2c55); color:#fff; border-radius:9px; padding:9px; text-align:left; cursor:pointer; transition:.15s ease; }
+    button:hover { transform: translateY(-1px); }
+    button.active { outline: 2px solid #ffd47f; background:linear-gradient(180deg,#34589e,#253f74); }
     .small { font-size:12px; opacity:.86; }
   </style>
 </head>
@@ -30,6 +31,7 @@
       <div class="stat">Lives: <b id="lives">20</b></div>
       <div class="stat">Wave: <b id="wave">1</b></div>
       <div class="stat">Enemies left: <b id="left">0</b></div>
+      <button id="startWaveBtn" style="width:100%;margin:6px 0 10px;text-align:center;font-weight:700">Start Wave</button>
       <div class="small" style="margin-bottom:8px">Select tower, then click on grass to place it.</div>
       <div id="towerList" class="grid"></div>
       <div class="small" style="margin-top:10px">No theme right now ✅<br>Currency: Gold ✅<br>Endless mode ✅</div>
@@ -44,6 +46,7 @@ const livesEl = document.getElementById('lives');
 const waveEl = document.getElementById('wave');
 const leftEl = document.getElementById('left');
 const towerList = document.getElementById('towerList');
+const startWaveBtn = document.getElementById('startWaveBtn');
 
 const W = canvas.width, H = canvas.height;
 const CELL = 40;
@@ -65,7 +68,7 @@ const TOWERS = [
 
 let selectedTower = TOWERS[0].key;
 let towers = [], enemies = [], bullets = [], effects = [];
-let gold = 240, lives = 20, wave = 1, spawnLeft = 0, spawnTimer = 0, gameOver = false;
+let gold = 240, lives = 20, wave = 1, spawnLeft = 0, spawnTimer = 0, gameOver = false, waveActive = false;
 
 const typeForWave = () => {
   if (wave % 7 === 0) return { hp: 280 + wave*10, speed: 58, reward: 20, r: 14, color:'#ff7f7f' }; // tank
@@ -114,6 +117,12 @@ function isPathCell(x,y) {
   return false;
 }
 
+
+startWaveBtn.addEventListener('click', () => {
+  if (gameOver || waveActive) return;
+  spawnWave();
+});
+
 canvas.addEventListener('mousedown', e => {
   if (gameOver) return;
   const r = canvas.getBoundingClientRect();
@@ -132,14 +141,18 @@ canvas.addEventListener('mousedown', e => {
 function spawnWave() {
   spawnLeft = 6 + Math.floor(wave * 1.7);
   spawnTimer = 0;
+  waveActive = true;
 }
 
 function update(dt) {
   if (gameOver) return;
-  if (spawnLeft <= 0 && enemies.length === 0) { wave++; spawnWave(); }
+  if (waveActive && spawnLeft <= 0 && enemies.length === 0) {
+    waveActive = false;
+    wave++;
+  }
 
   spawnTimer -= dt;
-  if (spawnLeft > 0 && spawnTimer <= 0) {
+  if (waveActive && spawnLeft > 0 && spawnTimer <= 0) {
     const t = typeForWave();
     enemies.push({ ...t, d:0, hp:t.hp, hpMax:t.hp, slowMul:1, slowT:0 });
     spawnLeft--;
@@ -218,20 +231,17 @@ function update(dt) {
   livesEl.textContent = lives;
   waveEl.textContent = wave;
   leftEl.textContent = enemies.length + spawnLeft;
+  startWaveBtn.textContent = waveActive ? 'Wave in progress...' : `Start Wave ${wave}`;
 }
 
 function draw() {
   ctx.fillStyle = '#1b2e4e';
   ctx.fillRect(0,0,W,H);
-
-  // grid
   ctx.globalAlpha = 0.12;
   ctx.strokeStyle = '#fff';
   for (let x=0;x<=W;x+=CELL){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
   for (let y=0;y<=H;y+=CELL){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
   ctx.globalAlpha = 1;
-
-  // path
   ctx.lineWidth = 34;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -243,8 +253,6 @@ function draw() {
   ctx.lineWidth = 2;
   ctx.strokeStyle = '#93a7cb';
   ctx.stroke();
-
-  // preview
   const t = TOWERS.find(v=>v.key===selectedTower);
   if (t) {
     const mx = mouse.x, my = mouse.y;
@@ -258,6 +266,10 @@ function draw() {
   }
 
   for (const tower of towers) {
+    if (tower.range > 0) {
+      ctx.strokeStyle = 'rgba(180,210,255,.16)';
+      ctx.beginPath(); ctx.arc(tower.x,tower.y,tower.range,0,Math.PI*2); ctx.stroke();
+    }
     ctx.fillStyle = tower.color;
     ctx.beginPath(); ctx.arc(tower.x,tower.y,13,0,Math.PI*2); ctx.fill();
     ctx.fillStyle = '#0b1426';
@@ -307,7 +319,6 @@ function loop(now){
   update(dt); draw(); requestAnimationFrame(loop);
 }
 
-spawnWave();
 makeButtons();
 requestAnimationFrame(loop);
 </script>
