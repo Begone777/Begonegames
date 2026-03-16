@@ -9,7 +9,7 @@
     * { box-sizing: border-box; }
     body { margin: 0; background: radial-gradient(circle at top,#111b35,#070b18 60%); color: #eef3ff; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
     .layout { display: grid; grid-template-columns: 1fr 320px; min-height: 100vh; }
-    canvas { width: 100%; height: auto; aspect-ratio: 1180 / 740; display: block; background: #101a2f; }
+    canvas { width: 100%; height: auto; aspect-ratio: 1480 / 900; display: block; background: #101a2f; }
     .panel { border-left: 1px solid #2d4377; background: linear-gradient(180deg,#122247,#0a1328); padding: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
     h1 { margin: 0 0 6px; font-size: 21px; }
     .muted { opacity: .8; font-size: 13px; margin-bottom: 10px; }
@@ -23,7 +23,7 @@
 </head>
 <body>
   <div class="layout">
-    <canvas id="game" width="1180" height="740"></canvas>
+    <canvas id="game" width="1480" height="900"></canvas>
     <aside class="panel">
       <h1>The Defender's Legacy</h1>
       <div class="muted">Maze-path endless tower defense</div>
@@ -31,7 +31,9 @@
       <div class="stat">Lives: <b id="lives">20</b></div>
       <div class="stat">Wave: <b id="wave">1</b></div>
       <div class="stat">Enemies left: <b id="left">0</b></div>
-      <button id="startWaveBtn" style="width:100%;margin:6px 0 10px;text-align:center;font-weight:700">Start Wave</button>
+      <button id="startWaveBtn" style="width:100%;margin:6px 0 8px;text-align:center;font-weight:700">Start Wave</button>
+      <button id="restartBtn" style="width:100%;margin:0 0 8px;text-align:center;font-weight:700">Restart</button>
+      <button id="fullscreenBtn" style="width:100%;margin:0 0 10px;text-align:center;font-weight:700">Fullscreen</button>
       <div class="small" style="margin-bottom:8px">Select tower, then click on grass to place it.</div>
       <div id="towerList" class="grid"></div>
       <div class="small" style="margin-top:10px">No theme right now ✅<br>Currency: Gold ✅<br>Endless mode ✅</div>
@@ -47,15 +49,17 @@ const waveEl = document.getElementById('wave');
 const leftEl = document.getElementById('left');
 const towerList = document.getElementById('towerList');
 const startWaveBtn = document.getElementById('startWaveBtn');
+const restartBtn = document.getElementById('restartBtn');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
 
 const W = canvas.width, H = canvas.height;
 const CELL = 40;
 const COLS = Math.floor(W / CELL), ROWS = Math.floor(H / CELL);
 
 const path = [
-  {x: 20, y: 80}, {x: 240, y: 80}, {x: 240, y: 210}, {x: 520, y: 210},
-  {x: 520, y: 120}, {x: 860, y: 120}, {x: 860, y: 340}, {x: 330, y: 340},
-  {x: 330, y: 540}, {x: 980, y: 540}, {x: 980, y: 690}, {x: 1140, y: 690}
+  {x: 30, y: 100}, {x: 300, y: 100}, {x: 300, y: 250}, {x: 660, y: 250},
+  {x: 660, y: 140}, {x: 1150, y: 140}, {x: 1150, y: 430}, {x: 430, y: 430},
+  {x: 430, y: 700}, {x: 1320, y: 700}, {x: 1320, y: 860}, {x: 1450, y: 860}
 ];
 
 const TOWERS = [
@@ -75,6 +79,20 @@ const typeForWave = () => {
   if (wave % 3 === 0) return { hp: 90 + wave*4, speed: 78, reward: 12, r: 9, color:'#ffd58f' };
   return { hp: 130 + wave*6, speed: 54, reward: 14, r: 11, color:'#d0f1ff' };
 };
+
+function restartGame() {
+  towers = [];
+  enemies = [];
+  bullets = [];
+  effects = [];
+  gold = 240;
+  lives = 20;
+  wave = 1;
+  spawnLeft = 0;
+  spawnTimer = 0;
+  gameOver = false;
+  waveActive = false;
+}
 
 function makeButtons() {
   towerList.innerHTML = '';
@@ -121,6 +139,17 @@ function isPathCell(x,y) {
 startWaveBtn.addEventListener('click', () => {
   if (gameOver || waveActive) return;
   spawnWave();
+});
+
+restartBtn.addEventListener('click', () => {
+  restartGame();
+});
+
+fullscreenBtn.addEventListener('click', async () => {
+  try {
+    if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+    else await document.exitFullscreen();
+  } catch (_) {}
 });
 
 canvas.addEventListener('mousedown', e => {
