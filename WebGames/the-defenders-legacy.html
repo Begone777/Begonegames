@@ -71,9 +71,9 @@ let towers = [], enemies = [], bullets = [], effects = [];
 let gold = 240, lives = 20, wave = 1, spawnLeft = 0, spawnTimer = 0, gameOver = false, waveActive = false;
 
 const typeForWave = () => {
-  if (wave % 7 === 0) return { hp: 280 + wave*10, speed: 58, reward: 20, r: 14, color:'#ff7f7f' }; // tank
-  if (wave % 3 === 0) return { hp: 90 + wave*4, speed: 112, reward: 12, r: 9, color:'#ffd58f' }; // fast
-  return { hp: 130 + wave*6, speed: 76, reward: 14, r: 11, color:'#d0f1ff' }; // normal
+  if (wave % 7 === 0) return { hp: 280 + wave*10, speed: 40, reward: 20, r: 14, color:'#ff7f7f' };
+  if (wave % 3 === 0) return { hp: 90 + wave*4, speed: 78, reward: 12, r: 9, color:'#ffd58f' };
+  return { hp: 130 + wave*6, speed: 54, reward: 14, r: 11, color:'#d0f1ff' };
 };
 
 function makeButtons() {
