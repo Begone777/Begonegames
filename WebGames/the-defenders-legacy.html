@@ -134,23 +134,35 @@ let gold = 320, lives = 24, wave = 1, spawnLeft = 0, spawnTimer = 0, gameOver = 
 let diff = DIFFICULTY.normal;
 
 const MONSTERS = [
-  { name:'Imp', hp: 95, speed: 85, reward: 10, r: 8, color:'#f6d8a9' },
-  { name:'Boar', hp: 170, speed: 58, reward: 14, r: 12, color:'#b89e7e' },
-  { name:'Sprite', hp: 120, speed: 105, reward: 12, r: 7, color:'#a9f0ff' },
-  { name:'Moss Golem', hp: 320, speed: 42, reward: 23, r: 15, color:'#8fb495' },
-  { name:'Spore Bat', hp: 140, speed: 112, reward: 13, r: 8, color:'#d8a4ff' },
-  { name:'Wraith', hp: 240, speed: 74, reward: 20, r: 11, color:'#c3e0ff' },
-  { name:'Root Brute', hp: 430, speed: 40, reward: 28, r: 17, color:'#9d855f' }
+  { name:'Imp', hp: 95, speed: 85, reward: 10, r: 8, color:'#f6d8a9', unlock: 1, weight: 8 },
+  { name:'Boar', hp: 170, speed: 58, reward: 14, r: 12, color:'#b89e7e', unlock: 1, weight: 6 },
+  { name:'Sprite', hp: 120, speed: 105, reward: 12, r: 7, color:'#a9f0ff', unlock: 3, weight: 6 },
+  { name:'Spore Bat', hp: 140, speed: 112, reward: 13, r: 8, color:'#d8a4ff', unlock: 5, weight: 5 },
+  { name:'Wraith', hp: 240, speed: 74, reward: 20, r: 11, color:'#c3e0ff', unlock: 7, weight: 4 },
+  { name:'Moss Golem', hp: 320, speed: 42, reward: 23, r: 15, color:'#8fb495', unlock: 9, weight: 4 },
+  { name:'Root Brute', hp: 430, speed: 40, reward: 28, r: 17, color:'#9d855f', unlock: 12, weight: 3 }
 ];
 
+function pickMonsterForWave(waveIndex) {
+  const pool = MONSTERS.filter(m => m.unlock <= waveIndex);
+  const totalWeight = pool.reduce((sum, m) => sum + m.weight, 0);
+  let roll = Math.random() * totalWeight;
+  for (const m of pool) {
+    roll -= m.weight;
+    if (roll <= 0) return m;
+  }
+  return pool[pool.length - 1] || MONSTERS[0];
+}
+
 function levelMonster(base, waveIndex) {
-  const scale = 1 + waveIndex * 0.055;
+  const hpScale = 1 + waveIndex * 0.065 + Math.max(0, waveIndex - 10) * 0.02;
+  const speedScale = 1 + waveIndex * 0.012;
   return {
     ...base,
-    hp: Math.floor(base.hp * scale * diff.hp),
-    hpMax: Math.floor(base.hp * scale * diff.hp),
-    speed: base.speed * (1 + waveIndex * 0.01) * diff.speed,
-    reward: Math.max(2, Math.floor(base.reward * (1 + waveIndex * 0.015) * diff.reward)),
+    hp: Math.floor(base.hp * hpScale * diff.hp),
+    hpMax: Math.floor(base.hp * hpScale * diff.hp),
+    speed: base.speed * speedScale * diff.speed,
+    reward: Math.max(2, Math.floor(base.reward * (1 + waveIndex * 0.018) * diff.reward)),
     d: 0,
     slowMul: 1,
     slowT: 0,
@@ -233,7 +245,7 @@ canvas.addEventListener('mousedown', e => {
 });
 
 function spawnWave() {
-  spawnLeft = 6 + Math.floor(wave * 1.95 * diff.spawn);
+  spawnLeft = 7 + Math.floor(wave * 2.15 * diff.spawn) + Math.floor(Math.max(0, wave - 8) * 0.35);
   spawnTimer = 0;
   waveActive = true;
 }
@@ -244,10 +256,10 @@ function update(dt) {
 
   spawnTimer -= dt;
   if (waveActive && spawnLeft > 0 && spawnTimer <= 0) {
-    const base = MONSTERS[(wave + spawnLeft + Math.floor(Math.random()*MONSTERS.length)) % MONSTERS.length];
+    const base = pickMonsterForWave(wave);
     enemies.push(levelMonster(base, wave));
     spawnLeft--;
-    spawnTimer = Math.max(0.12, (0.78 - wave * 0.011) / diff.spawn);
+    spawnTimer = Math.max(0.08, (0.8 - wave * 0.013) / diff.spawn);
   }
 
   for (const e of enemies) {
