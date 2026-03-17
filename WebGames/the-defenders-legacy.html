@@ -3,40 +3,81 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The Defender's Legacy</title>
+  <title>The Defender's Legacy — Emerald Frontier</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
-    body { margin: 0; background: radial-gradient(circle at top,#111b35,#070b18 60%); color: #eef3ff; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    .layout { display: grid; grid-template-columns: 1fr 320px; min-height: 100vh; }
-    canvas { width: 100%; height: auto; aspect-ratio: 1480 / 900; display: block; background: #101a2f; }
-    .panel { border-left: 1px solid #2d4377; background: linear-gradient(180deg,#122247,#0a1328); padding: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 20% 0%, #203b24, #0b1a11 68%);
+      color: #ecffee;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    .layout { display: grid; grid-template-columns: 1fr 340px; min-height: 100vh; }
+    canvas {
+      width: 100%; height: auto; aspect-ratio: 1480 / 900; display: block;
+      background: linear-gradient(180deg, #1e4a27, #14331b 60%, #112a17);
+      image-rendering: auto;
+    }
+    .panel {
+      border-left: 1px solid #335d40;
+      background: linear-gradient(180deg, #1f3e28, #142419);
+      padding: 14px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+    }
     h1 { margin: 0 0 6px; font-size: 21px; }
-    .muted { opacity: .8; font-size: 13px; margin-bottom: 10px; }
-    .stat { background:linear-gradient(180deg,#182a52,#101d3d); border:1px solid #4a6bc2; border-radius:10px; padding:8px; margin-bottom:8px; font-size:14px; }
-    .grid { display: grid; gap: 8px; }
-    button { border:1px solid #5a80e0; background:linear-gradient(180deg,#284784,#1b2c55); color:#fff; border-radius:9px; padding:9px; text-align:left; cursor:pointer; transition:.15s ease; }
-    button:hover { transform: translateY(-1px); }
-    button.active { outline: 2px solid #ffd47f; background:linear-gradient(180deg,#34589e,#253f74); }
-    .small { font-size:12px; opacity:.86; }
+    .muted { opacity: .85; font-size: 13px; margin-bottom: 10px; }
+    .stat {
+      background: linear-gradient(180deg, #2a5436, #1d3a26);
+      border: 1px solid #55886a;
+      border-radius: 10px;
+      padding: 8px;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .grid { display: grid; gap: 8px; max-height: 56vh; overflow: auto; padding-right: 4px; }
+    button, select {
+      border: 1px solid #5f9a75;
+      background: linear-gradient(180deg, #3f7a52, #2a5a3b);
+      color: #fff;
+      border-radius: 9px;
+      padding: 9px;
+      text-align: left;
+      cursor: pointer;
+      transition: .15s ease;
+      font: inherit;
+    }
+    button:hover, select:hover { transform: translateY(-1px); }
+    button.active { outline: 2px solid #f8e094; background: linear-gradient(180deg, #4f9163, #326b46); }
+    .small { font-size: 12px; opacity: .9; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   </style>
 </head>
 <body>
   <div class="layout">
     <canvas id="game" width="1480" height="900"></canvas>
     <aside class="panel">
-      <h1>The Defender's Legacy</h1>
-      <div class="muted">Maze-path endless tower defense</div>
+      <h1>Emerald Frontier</h1>
+      <div class="muted">Forest tower defense — protect the heartwood.</div>
+      <div class="row" style="margin-bottom:8px">
+        <select id="difficulty">
+          <option value="easy">Easy</option>
+          <option value="normal" selected>Normal</option>
+          <option value="hard">Hard</option>
+          <option value="nightmare">Nightmare</option>
+        </select>
+        <button id="startWaveBtn" style="font-weight:700;text-align:center">Start Wave</button>
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <button id="restartBtn" style="font-weight:700;text-align:center">Restart</button>
+        <button id="fullscreenBtn" style="font-weight:700;text-align:center">Fullscreen</button>
+      </div>
       <div class="stat">Gold: <b id="gold">0</b></div>
       <div class="stat">Lives: <b id="lives">20</b></div>
       <div class="stat">Wave: <b id="wave">1</b></div>
       <div class="stat">Enemies left: <b id="left">0</b></div>
-      <button id="startWaveBtn" style="width:100%;margin:6px 0 8px;text-align:center;font-weight:700">Start Wave</button>
-      <button id="restartBtn" style="width:100%;margin:0 0 8px;text-align:center;font-weight:700">Restart</button>
-      <button id="fullscreenBtn" style="width:100%;margin:0 0 10px;text-align:center;font-weight:700">Fullscreen</button>
-      <div class="small" style="margin-bottom:8px">Select tower, then click on grass to place it.</div>
+      <div class="small" style="margin-bottom:8px">Pick tower → click open grass. Tower identity is shown by color + icon shape.</div>
       <div id="towerList" class="grid"></div>
-      <div class="small" style="margin-top:10px">No theme right now ✅<br>Currency: Gold ✅<br>Endless mode ✅</div>
     </aside>
   </div>
 
@@ -51,10 +92,17 @@ const towerList = document.getElementById('towerList');
 const startWaveBtn = document.getElementById('startWaveBtn');
 const restartBtn = document.getElementById('restartBtn');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
+const difficultySel = document.getElementById('difficulty');
 
 const W = canvas.width, H = canvas.height;
 const CELL = 40;
-const COLS = Math.floor(W / CELL), ROWS = Math.floor(H / CELL);
+
+const DIFFICULTY = {
+  easy: { lives: 32, gold: 420, hp: 0.85, speed: 0.9, reward: 1.1, spawn: 0.95 },
+  normal: { lives: 24, gold: 320, hp: 1.0, speed: 1.0, reward: 1.0, spawn: 1.0 },
+  hard: { lives: 20, gold: 260, hp: 1.22, speed: 1.12, reward: 0.92, spawn: 1.08 },
+  nightmare: { lives: 14, gold: 210, hp: 1.45, speed: 1.25, reward: 0.85, spawn: 1.18 }
+};
 
 const path = [
   {x: 30, y: 100}, {x: 300, y: 100}, {x: 300, y: 250}, {x: 660, y: 250},
@@ -63,42 +111,69 @@ const path = [
 ];
 
 const TOWERS = [
-  { key:'arrow', name:'Arrow Tower', cost:70, range:150, fireRate:0.85, dmg:16, color:'#8fd0ff' },
-  { key:'cannon', name:'Cannon Tower', cost:120, range:140, fireRate:1.35, dmg:32, splash:52, color:'#ffb97d' },
-  { key:'frost', name:'Frost Tower', cost:100, range:130, fireRate:1.0, dmg:10, slow:0.55, slowTime:1.8, color:'#9fe6ff' },
-  { key:'sniper', name:'Sniper Tower', cost:170, range:280, fireRate:2.2, dmg:76, color:'#f1d4ff' },
-  { key:'mint', name:'Gold Mint', cost:130, range:0, fireRate:3.0, dmg:0, mint:26, color:'#ffe88b' }
+  { key:'arrow', name:'Arrow Nest', cost:70, range:150, fireRate:0.85, dmg:16, color:'#8fd0ff', icon:'triangle' },
+  { key:'cannon', name:'Bark Cannon', cost:120, range:140, fireRate:1.35, dmg:32, splash:52, color:'#ffb97d', icon:'square' },
+  { key:'frost', name:'Frost Bloom', cost:100, range:130, fireRate:1.0, dmg:10, slow:0.55, slowTime:1.8, color:'#9fe6ff', icon:'diamond' },
+  { key:'sniper', name:'Hawkeye Roost', cost:170, range:280, fireRate:2.2, dmg:76, color:'#f1d4ff', icon:'star' },
+  { key:'mint', name:'Sap Mint', cost:130, range:0, fireRate:3.0, dmg:0, mint:26, color:'#ffe88b', icon:'hex' },
+  { key:'poison', name:'Venom Thicket', cost:145, range:155, fireRate:1.2, dmg:12, poison:8, poisonTime:2.2, color:'#7fff98', icon:'leaf' },
+  { key:'storm', name:'Storm Oak', cost:180, range:170, fireRate:1.7, dmg:24, chain:2, color:'#9db4ff', icon:'bolt' },
+  { key:'ember', name:'Ember Totem', cost:155, range:145, fireRate:1.1, dmg:18, burn:11, burnTime:2.4, color:'#ff8f72', icon:'flame' },
+  { key:'thorn', name:'Thorn Pod', cost:90, range:115, fireRate:0.45, dmg:8, color:'#b2ff8e', icon:'cross' },
+  { key:'totem', name:'Spirit Totem', cost:210, range:150, fireRate:0, aura:0.17, color:'#ffd8ff', icon:'ring' },
+  { key:'quarry', name:'Stone Quarry', cost:160, range:0, fireRate:4.2, dmg:0, mint:36, color:'#d8d3ba', icon:'gem' },
+  { key:'sun', name:'Sun Prism', cost:240, range:200, fireRate:2.8, dmg:95, color:'#fff0a1', icon:'sun' },
+  { key:'mist', name:'Mist Shrine', cost:185, range:160, fireRate:1.6, dmg:14, slow:0.7, slowTime:2.6, color:'#8df3ec', icon:'moon' },
+  { key:'vine', name:'Vine Snare', cost:175, range:140, fireRate:1.9, dmg:18, root:0.7, color:'#68d27e', icon:'vines' },
+  { key:'arcane', name:'Arcane Willow', cost:260, range:220, fireRate:2.0, dmg:56, splash:80, color:'#c59bff', icon:'orb' }
 ];
 
 let selectedTower = TOWERS[0].key;
 let towers = [], enemies = [], bullets = [], effects = [];
-let gold = 240, lives = 20, wave = 1, spawnLeft = 0, spawnTimer = 0, gameOver = false, waveActive = false;
+let gold = 320, lives = 24, wave = 1, spawnLeft = 0, spawnTimer = 0, gameOver = false, waveActive = false;
+let diff = DIFFICULTY.normal;
 
-const typeForWave = () => {
-  if (wave % 7 === 0) return { hp: 280 + wave*10, speed: 40, reward: 20, r: 14, color:'#ff7f7f' };
-  if (wave % 3 === 0) return { hp: 90 + wave*4, speed: 78, reward: 12, r: 9, color:'#ffd58f' };
-  return { hp: 130 + wave*6, speed: 54, reward: 14, r: 11, color:'#d0f1ff' };
-};
+const MONSTERS = [
+  { name:'Imp', hp: 95, speed: 85, reward: 10, r: 8, color:'#f6d8a9' },
+  { name:'Boar', hp: 170, speed: 58, reward: 14, r: 12, color:'#b89e7e' },
+  { name:'Sprite', hp: 120, speed: 105, reward: 12, r: 7, color:'#a9f0ff' },
+  { name:'Moss Golem', hp: 320, speed: 42, reward: 23, r: 15, color:'#8fb495' },
+  { name:'Spore Bat', hp: 140, speed: 112, reward: 13, r: 8, color:'#d8a4ff' },
+  { name:'Wraith', hp: 240, speed: 74, reward: 20, r: 11, color:'#c3e0ff' },
+  { name:'Root Brute', hp: 430, speed: 40, reward: 28, r: 17, color:'#9d855f' }
+];
+
+function levelMonster(base, waveIndex) {
+  const scale = 1 + waveIndex * 0.055;
+  return {
+    ...base,
+    hp: Math.floor(base.hp * scale * diff.hp),
+    hpMax: Math.floor(base.hp * scale * diff.hp),
+    speed: base.speed * (1 + waveIndex * 0.01) * diff.speed,
+    reward: Math.max(2, Math.floor(base.reward * (1 + waveIndex * 0.015) * diff.reward)),
+    d: 0,
+    slowMul: 1,
+    slowT: 0,
+    burn: 0,
+    burnT: 0,
+    poison: 0,
+    poisonT: 0,
+    rootT: 0
+  };
+}
 
 function restartGame() {
-  towers = [];
-  enemies = [];
-  bullets = [];
-  effects = [];
-  gold = 240;
-  lives = 20;
-  wave = 1;
-  spawnLeft = 0;
-  spawnTimer = 0;
-  gameOver = false;
-  waveActive = false;
+  diff = DIFFICULTY[difficultySel.value] || DIFFICULTY.normal;
+  towers = []; enemies = []; bullets = []; effects = [];
+  gold = diff.gold; lives = diff.lives; wave = 1;
+  spawnLeft = 0; spawnTimer = 0; gameOver = false; waveActive = false;
 }
 
 function makeButtons() {
   towerList.innerHTML = '';
   for (const t of TOWERS) {
     const b = document.createElement('button');
-    b.innerHTML = `<b>${t.name}</b><div class='small'>Cost ${t.cost}</div>`;
+    b.innerHTML = `<b style="color:${t.color}">⬤</b> <b>${t.name}</b><div class='small'>Cost ${t.cost} • Range ${Math.floor(t.range || 0)}</div>`;
     if (t.key === selectedTower) b.classList.add('active');
     b.onclick = () => { selectedTower = t.key; makeButtons(); };
     towerList.appendChild(b);
@@ -122,9 +197,6 @@ function pathPos(d) {
   return { x:path[path.length-1].x, y:path[path.length-1].y, done:true };
 }
 
-let totalPathLen = 0;
-for (let i=0;i<path.length-1;i++) totalPathLen += dist(path[i].x,path[i].y,path[i+1].x,path[i+1].y);
-
 function isPathCell(x,y) {
   for (let i=0;i<path.length-1;i++) {
     const a = path[i], b = path[i+1];
@@ -135,15 +207,9 @@ function isPathCell(x,y) {
   return false;
 }
 
-
-startWaveBtn.addEventListener('click', () => {
-  if (gameOver || waveActive) return;
-  spawnWave();
-});
-
-restartBtn.addEventListener('click', () => {
-  restartGame();
-});
+startWaveBtn.addEventListener('click', () => { if (!gameOver && !waveActive) spawnWave(); });
+restartBtn.addEventListener('click', restartGame);
+difficultySel.addEventListener('change', restartGame);
 
 fullscreenBtn.addEventListener('click', async () => {
   try {
@@ -160,36 +226,35 @@ canvas.addEventListener('mousedown', e => {
   const cellX = Math.floor(x / CELL) * CELL + CELL/2;
   const cellY = Math.floor(y / CELL) * CELL + CELL/2;
   const tower = TOWERS.find(t=>t.key===selectedTower);
-  if (!tower || gold < tower.cost) return;
-  if (isPathCell(cellX,cellY)) return;
+  if (!tower || gold < tower.cost || isPathCell(cellX,cellY)) return;
   if (towers.some(t => dist(t.x,t.y,cellX,cellY) < 34)) return;
-  towers.push({ ...tower, x: cellX, y: cellY, cd: Math.random()*0.4 });
+  towers.push({ ...tower, x: cellX, y: cellY, cd: Math.random()*0.5 });
   gold -= tower.cost;
 });
 
 function spawnWave() {
-  spawnLeft = 6 + Math.floor(wave * 1.7);
+  spawnLeft = 6 + Math.floor(wave * 1.95 * diff.spawn);
   spawnTimer = 0;
   waveActive = true;
 }
 
 function update(dt) {
   if (gameOver) return;
-  if (waveActive && spawnLeft <= 0 && enemies.length === 0) {
-    waveActive = false;
-    wave++;
-  }
+  if (waveActive && spawnLeft <= 0 && enemies.length === 0) { waveActive = false; wave++; }
 
   spawnTimer -= dt;
   if (waveActive && spawnLeft > 0 && spawnTimer <= 0) {
-    const t = typeForWave();
-    enemies.push({ ...t, d:0, hp:t.hp, hpMax:t.hp, slowMul:1, slowT:0 });
+    const base = MONSTERS[(wave + spawnLeft + Math.floor(Math.random()*MONSTERS.length)) % MONSTERS.length];
+    enemies.push(levelMonster(base, wave));
     spawnLeft--;
-    spawnTimer = Math.max(0.18, 0.85 - wave * 0.013);
+    spawnTimer = Math.max(0.12, (0.78 - wave * 0.011) / diff.spawn);
   }
 
   for (const e of enemies) {
     if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slowMul = 1; }
+    if (e.rootT > 0) { e.rootT -= dt; if (e.rootT > 0) continue; }
+    if (e.burnT > 0) { e.burnT -= dt; e.hp -= e.burn * dt; }
+    if (e.poisonT > 0) { e.poisonT -= dt; e.hp -= e.poison * dt; }
     e.d += e.speed * e.slowMul * dt;
     const p = pathPos(e.d);
     e.x = p.x; e.y = p.y;
@@ -198,15 +263,15 @@ function update(dt) {
 
   for (const t of towers) {
     t.cd -= dt;
-    if (t.key === 'mint') {
-      if (t.cd <= 0) {
-        gold += t.mint;
-        effects.push({ x:t.x, y:t.y-16, text:`+${t.mint}g`, t:0.8, c:'#ffe88b' });
-        t.cd = t.fireRate;
-      }
+    if ((t.key === 'mint' || t.key === 'quarry') && t.cd <= 0) {
+      gold += t.mint;
+      effects.push({ x:t.x, y:t.y-16, text:`+${t.mint}g`, t:0.8, c:'#ffe88b' });
+      t.cd = t.fireRate;
       continue;
     }
+    if (t.key === 'totem') continue;
     if (t.cd > 0) continue;
+
     let target = null, best = -1;
     for (const e of enemies) {
       if (e.dead) continue;
@@ -214,10 +279,12 @@ function update(dt) {
     }
     if (!target) continue;
 
+    const boost = towers.some(o => o.key==='totem' && dist(o.x,o.y,t.x,t.y) <= o.range) ? 1 + 0.17 : 1;
     bullets.push({
       x:t.x, y:t.y, tx:target.x, ty:target.y, target, speed:420,
-      dmg:t.dmg, splash:t.splash||0, slow:t.slow||0, slowTime:t.slowTime||0,
-      color:t.color
+      dmg:(t.dmg||0)*boost, splash:t.splash||0, slow:t.slow||0, slowTime:t.slowTime||0,
+      burn:t.burn||0, burnTime:t.burnTime||0, poison:t.poison||0, poisonTime:t.poisonTime||0,
+      root:t.root||0, chain:t.chain||0, color:t.color
     });
     t.cd = t.fireRate;
   }
@@ -231,24 +298,31 @@ function update(dt) {
     b.x += dx / d * Math.min(step, d);
     b.y += dy / d * Math.min(step, d);
     if (d < 10) {
+      const hits = [];
       if (b.splash > 0) {
-        for (const e of enemies) {
-          if (e.dead) continue;
-          if (dist(b.x,b.y,e.x,e.y) <= b.splash) {
-            e.hp -= b.dmg;
-            if (b.slow) { e.slowMul = b.slow; e.slowT = Math.max(e.slowT, b.slowTime); }
-          }
-        }
-      } else {
-        b.target.hp -= b.dmg;
-        if (b.slow) { b.target.slowMul = b.slow; b.target.slowT = Math.max(b.target.slowT, b.slowTime); }
+        for (const e of enemies) if (!e.dead && dist(b.x,b.y,e.x,e.y) <= b.splash) hits.push(e);
+      } else hits.push(b.target);
+      if (b.chain > 0) {
+        const nearby = enemies.filter(e=>!e.dead&&e!==b.target&&dist(b.target.x,b.target.y,e.x,e.y)<105).slice(0,b.chain);
+        hits.push(...nearby);
+      }
+      for (const e of hits) {
+        e.hp -= b.dmg;
+        if (b.slow) { e.slowMul = Math.min(e.slowMul, b.slow); e.slowT = Math.max(e.slowT, b.slowTime); }
+        if (b.burn) { e.burn = Math.max(e.burn, b.burn); e.burnT = Math.max(e.burnT, b.burnTime); }
+        if (b.poison) { e.poison = Math.max(e.poison, b.poison); e.poisonT = Math.max(e.poisonT, b.poisonTime); }
+        if (b.root) e.rootT = Math.max(e.rootT, b.root);
       }
       b.dead = true;
     }
   }
 
   for (const e of enemies) {
-    if (!e.dead && e.hp <= 0) { e.dead = true; gold += e.reward; effects.push({x:e.x,y:e.y,text:`+${e.reward}g`,t:0.8,c:'#a6ffb8'}); }
+    if (!e.dead && e.hp <= 0) {
+      e.dead = true;
+      gold += e.reward;
+      effects.push({x:e.x,y:e.y,text:`+${e.reward}g`,t:0.8,c:'#a6ffb8'});
+    }
   }
 
   enemies = enemies.filter(e=>!e.dead);
@@ -260,34 +334,61 @@ function update(dt) {
   livesEl.textContent = lives;
   waveEl.textContent = wave;
   leftEl.textContent = enemies.length + spawnLeft;
-  startWaveBtn.textContent = waveActive ? 'Wave in progress...' : `Start Wave ${wave}`;
+  startWaveBtn.textContent = waveActive ? 'Wave running...' : `Start Wave ${wave}`;
+}
+
+function drawIcon(x,y,icon) {
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.strokeStyle = '#11231a';
+  ctx.fillStyle = '#11231a';
+  ctx.lineWidth = 2;
+  if (icon === 'triangle') { ctx.beginPath(); ctx.moveTo(0,-6); ctx.lineTo(6,5); ctx.lineTo(-6,5); ctx.closePath(); ctx.stroke(); }
+  else if (icon === 'square') ctx.strokeRect(-5,-5,10,10);
+  else if (icon === 'diamond') { ctx.rotate(Math.PI/4); ctx.strokeRect(-4,-4,8,8); }
+  else if (icon === 'star') { for (let i=0;i<5;i++){ ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(i*1.257)*7,Math.sin(i*1.257)*7); ctx.stroke(); } }
+  else if (icon === 'hex') { ctx.beginPath(); for(let i=0;i<6;i++){ const a=i*Math.PI/3; ctx.lineTo(Math.cos(a)*6,Math.sin(a)*6);} ctx.closePath(); ctx.stroke(); }
+  else if (icon === 'leaf') { ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.stroke(); }
+  else if (icon === 'bolt') { ctx.beginPath(); ctx.moveTo(-2,-6); ctx.lineTo(3,-1); ctx.lineTo(-1,-1); ctx.lineTo(2,6); ctx.stroke(); }
+  else if (icon === 'flame') { ctx.beginPath(); ctx.moveTo(0,-6); ctx.quadraticCurveTo(5,-1,0,6); ctx.quadraticCurveTo(-5,-1,0,-6); ctx.stroke(); }
+  else if (icon === 'cross') { ctx.beginPath(); ctx.moveTo(-5,0); ctx.lineTo(5,0); ctx.moveTo(0,-5); ctx.lineTo(0,5); ctx.stroke(); }
+  else if (icon === 'ring') { ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.stroke(); }
+  else if (icon === 'gem') { ctx.beginPath(); ctx.moveTo(0,-6); ctx.lineTo(6,0); ctx.lineTo(0,6); ctx.lineTo(-6,0); ctx.closePath(); ctx.stroke(); }
+  else if (icon === 'sun') { ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2); ctx.stroke(); for(let i=0;i<8;i++){const a=i*Math.PI/4;ctx.beginPath();ctx.moveTo(Math.cos(a)*5,Math.sin(a)*5);ctx.lineTo(Math.cos(a)*8,Math.sin(a)*8);ctx.stroke();} }
+  else if (icon === 'moon') { ctx.beginPath(); ctx.arc(-1,0,5,0,Math.PI*2); ctx.stroke(); }
+  else if (icon === 'vines') { ctx.beginPath(); ctx.moveTo(-5,4); ctx.quadraticCurveTo(-2,-5,1,2); ctx.quadraticCurveTo(3,7,5,-4); ctx.stroke(); }
+  else if (icon === 'orb') { ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(0,0,8,0,Math.PI*2); ctx.stroke(); }
+  ctx.restore();
 }
 
 function draw() {
-  ctx.fillStyle = '#1b2e4e';
-  ctx.fillRect(0,0,W,H);
-  ctx.globalAlpha = 0.12;
-  ctx.strokeStyle = '#fff';
-  for (let x=0;x<=W;x+=CELL){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
-  for (let y=0;y<=H;y+=CELL){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  // forest floor
+  ctx.fillStyle = '#1c4728'; ctx.fillRect(0,0,W,H);
+  ctx.globalAlpha = 0.18;
+  for (let i=0;i<180;i++) {
+    ctx.fillStyle = i%2 ? '#2f6a3f' : '#245735';
+    ctx.fillRect((i*47)%W, (i*91)%H, 8, 8);
+  }
   ctx.globalAlpha = 1;
+
+  // path
   ctx.lineWidth = 34;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.strokeStyle = '#5f6d84';
+  ctx.strokeStyle = '#7a684f';
   ctx.beginPath();
   ctx.moveTo(path[0].x,path[0].y);
   for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
   ctx.stroke();
   ctx.lineWidth = 2;
-  ctx.strokeStyle = '#93a7cb';
+  ctx.strokeStyle = '#b49b72';
   ctx.stroke();
+
   const t = TOWERS.find(v=>v.key===selectedTower);
   if (t) {
-    const mx = mouse.x, my = mouse.y;
-    const cx = Math.floor(mx / CELL) * CELL + CELL/2;
-    const cy = Math.floor(my / CELL) * CELL + CELL/2;
-    ctx.strokeStyle = isPathCell(cx,cy) ? 'rgba(255,80,80,.8)' : 'rgba(255,255,255,.8)';
+    const cx = Math.floor(mouse.x / CELL) * CELL + CELL/2;
+    const cy = Math.floor(mouse.y / CELL) * CELL + CELL/2;
+    ctx.strokeStyle = isPathCell(cx,cy) ? 'rgba(255,80,80,.8)' : 'rgba(210,255,220,.85)';
     ctx.setLineDash([6,4]);
     ctx.beginPath(); ctx.rect(cx-CELL/2+2, cy-CELL/2+2, CELL-4, CELL-4); ctx.stroke();
     if (t.range>0){ ctx.beginPath(); ctx.arc(cx,cy,t.range,0,Math.PI*2); ctx.stroke(); }
@@ -296,23 +397,19 @@ function draw() {
 
   for (const tower of towers) {
     if (tower.range > 0) {
-      ctx.strokeStyle = 'rgba(180,210,255,.16)';
+      ctx.strokeStyle = 'rgba(200,255,210,.12)';
       ctx.beginPath(); ctx.arc(tower.x,tower.y,tower.range,0,Math.PI*2); ctx.stroke();
     }
     ctx.fillStyle = tower.color;
     ctx.beginPath(); ctx.arc(tower.x,tower.y,13,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#0b1426';
-    ctx.font = '11px sans-serif';
-    ctx.fillText(tower.key[0].toUpperCase(), tower.x-4, tower.y+4);
+    drawIcon(tower.x, tower.y, tower.icon);
   }
 
   for (const e of enemies) {
     ctx.fillStyle = e.color;
     ctx.beginPath(); ctx.arc(e.x,e.y,e.r,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.fillRect(e.x-14,e.y-16,28,4);
-    ctx.fillStyle = '#7dff9c';
-    ctx.fillRect(e.x-14,e.y-16,28 * clamp(e.hp / e.hpMax,0,1),4);
+    ctx.fillStyle = '#000'; ctx.fillRect(e.x-15,e.y-17,30,4);
+    ctx.fillStyle = '#7dff9c'; ctx.fillRect(e.x-15,e.y-17,30 * clamp(e.hp / e.hpMax,0,1),4);
   }
 
   for (const b of bullets) {
@@ -330,7 +427,7 @@ function draw() {
 
   if (gameOver) {
     ctx.fillStyle='rgba(0,0,0,.62)'; ctx.fillRect(0,0,W,H);
-    ctx.fillStyle='#fff'; ctx.font='bold 52px sans-serif'; ctx.fillText('Game Over', W/2-160, H/2-10);
+    ctx.fillStyle='#fff'; ctx.font='bold 52px sans-serif'; ctx.fillText('Forest Lost', W/2-150, H/2-10);
     ctx.font='22px sans-serif'; ctx.fillText(`Reached Wave ${wave}`, W/2-95, H/2+30);
   }
 }
@@ -348,6 +445,7 @@ function loop(now){
   update(dt); draw(); requestAnimationFrame(loop);
 }
 
+restartGame();
 makeButtons();
 requestAnimationFrame(loop);
 </script>
