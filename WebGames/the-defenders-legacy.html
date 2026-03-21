@@ -12,19 +12,33 @@
       background: radial-gradient(circle at 20% 0%, #203b24, #0b1a11 68%);
       color: #ecffee;
       font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      overflow: hidden;
     }
-    .layout { display: grid; grid-template-columns: 1fr 340px; min-height: 100vh; }
+    .layout { min-height: 100vh; }
     canvas {
-      width: 100%; height: auto; aspect-ratio: 1480 / 900; display: block;
+      width: 100vw;
+      height: 100vh;
+      display: block;
       background: linear-gradient(180deg, #1e4a27, #14331b 60%, #112a17);
       image-rendering: auto;
     }
     .panel {
-      border-left: 1px solid #335d40;
-      background: linear-gradient(180deg, #1f3e28, #142419);
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      width: min(340px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+      border: 1px solid #335d40;
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(31,62,40,.96), rgba(20,36,25,.96));
       padding: 14px;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 10px 30px rgba(0,0,0,.45);
+      transform: translateX(calc(100% + 20px));
+      transition: transform .18s ease;
+      z-index: 15;
     }
+    .panel.open { transform: translateX(0); }
     h1 { margin: 0 0 6px; font-size: 21px; }
     .muted { opacity: .85; font-size: 13px; margin-bottom: 10px; }
     .stat {
@@ -51,12 +65,43 @@
     button.active { outline: 2px solid #f8e094; background: linear-gradient(180deg, #4f9163, #326b46); }
     .small { font-size: 12px; opacity: .9; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .hud {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 12;
+      display: grid;
+      gap: 6px;
+      pointer-events: none;
+    }
+    .hud .stat { margin: 0; min-width: 170px; backdrop-filter: blur(3px); }
+    .shop-btn {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 20;
+      border: 1px solid #7fb38f;
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-weight: 700;
+      background: linear-gradient(180deg, #3f7a52, #2a5a3b);
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
   </style>
 </head>
 <body>
   <div class="layout">
     <canvas id="game" width="1480" height="900"></canvas>
-    <aside class="panel">
+    <button id="shopBtn" class="shop-btn">🛒 Shop</button>
+    <div class="hud">
+      <div class="stat">Gold: <b id="gold">0</b></div>
+      <div class="stat">Lives: <b id="lives">20</b></div>
+      <div class="stat">Wave: <b id="wave">1</b></div>
+      <div class="stat">Enemies left: <b id="left">0</b></div>
+    </div>
+    <aside id="shopPanel" class="panel">
       <h1>Emerald Frontier</h1>
       <div class="muted">Forest tower defense — protect the heartwood.</div>
       <div class="row" style="margin-bottom:8px">
@@ -72,10 +117,6 @@
         <button id="restartBtn" style="font-weight:700;text-align:center">Restart</button>
         <button id="fullscreenBtn" style="font-weight:700;text-align:center">Fullscreen</button>
       </div>
-      <div class="stat">Gold: <b id="gold">0</b></div>
-      <div class="stat">Lives: <b id="lives">20</b></div>
-      <div class="stat">Wave: <b id="wave">1</b></div>
-      <div class="stat">Enemies left: <b id="left">0</b></div>
       <div class="small" style="margin-bottom:8px">Pick tower → click open grass. Tower identity is shown by color + icon shape.</div>
       <div id="towerList" class="grid"></div>
     </aside>
@@ -93,8 +134,10 @@ const startWaveBtn = document.getElementById('startWaveBtn');
 const restartBtn = document.getElementById('restartBtn');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 const difficultySel = document.getElementById('difficulty');
+const shopBtn = document.getElementById('shopBtn');
+const shopPanel = document.getElementById('shopPanel');
 
-const W = canvas.width, H = canvas.height;
+let W = canvas.width, H = canvas.height;
 const CELL = 40;
 
 const DIFFICULTY = {
@@ -222,6 +265,20 @@ function isPathCell(x,y) {
 startWaveBtn.addEventListener('click', () => { if (!gameOver && !waveActive) spawnWave(); });
 restartBtn.addEventListener('click', restartGame);
 difficultySel.addEventListener('change', restartGame);
+shopBtn.addEventListener('click', () => {
+  shopPanel.classList.toggle('open');
+  shopBtn.textContent = shopPanel.classList.contains('open') ? '✖ Close Shop' : '🛒 Shop';
+});
+
+function fitCanvasToScreen() {
+  const targetW = Math.max(1100, window.innerWidth);
+  const targetH = Math.max(700, window.innerHeight);
+  canvas.width = targetW;
+  canvas.height = targetH;
+  W = targetW;
+  H = targetH;
+}
+window.addEventListener('resize', fitCanvasToScreen);
 
 fullscreenBtn.addEventListener('click', async () => {
   try {
@@ -457,6 +514,7 @@ function loop(now){
   update(dt); draw(); requestAnimationFrame(loop);
 }
 
+fitCanvasToScreen();
 restartGame();
 makeButtons();
 requestAnimationFrame(loop);
